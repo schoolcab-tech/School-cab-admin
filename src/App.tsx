@@ -39,25 +39,32 @@ import BulkUploadSchools from "./pages/schools/BulkUploadSchools";
 import EditSchool from "./pages/schools/EditSchool";
 import SchoolDetail from "./pages/schools/SchoolDetail";
 import Settings from "./pages/Settings";
-import Students from "./pages/Students";
+import StudentDetailPage, {
+  SchoolAdminStudentDetailPage,
+} from "./pages/students/StudentDetailPage";
+import Students, { SchoolAdminStudentsPage } from "./pages/Students";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import Unauthorized from "./pages/Unauthorized";
 import AddStudentPage from "./pages/students/AddStudentPage";
 import BulkUploadStudents from "./pages/students/BulkUploadStudents";
 import BulkOverrideStudents from "./pages/students/BulkOverrideStudents";
 import EditStudentPage from "./pages/students/EditStudentPage";
-import StudentDetailPage from "./pages/students/StudentDetailPage";
-import TermsAndConditions from "./pages/TermsAndConditions";
-import Unauthorized from "./pages/Unauthorized";
-
 import { Loader2 } from "lucide-react";
-import BookingDetailPage from "./pages/bookings/BookingDetailPage";
-
-// Route Ordering Pages
-import RouteOrderingPage from "./pages/route-ordering/RouteOrderingPage";
-import RouteOrderingDetailPage from "./pages/route-ordering/RouteOrderingDetailPage";
+import BookingDetailPage, {
+  SchoolAdminBookingDetailPage,
+} from "./pages/bookings/BookingDetailPage";
+import RouteOrderingPage, {
+  SchoolAdminRouteOrderingPage,
+} from "./pages/route-ordering/RouteOrderingPage";
+import RouteOrderingDetailPage, {
+  SchoolAdminRouteOrderingDetailPage,
+} from "./pages/route-ordering/RouteOrderingDetailPage";
 import DriverTripManagement from "./pages/route-ordering/DriverTripManagement";
 
 // Trip Schedules Page
-import TripSchedulesPage from "./pages/trip-schedules/TripSchedulesPage";
+import TripSchedulesPage, {
+  SchoolAdminTripSchedulesPage,
+} from "./pages/trip-schedules/TripSchedulesPage";
 
 // Website Leads Page
 import WebsiteLeadsPage from "./pages/WebsiteLeadsPage";
@@ -72,6 +79,7 @@ import FleetMappingPage from "./pages/master-admin/FleetMappingPage";
 import FleetOwnersPage from "./pages/master-admin/FleetOwnersPage";
 import LiveTrackingPage from "./pages/master-admin/LiveTrackingPage";
 import SchoolAdminsPage from "./pages/master-admin/SchoolAdminsPage";
+import PlatformAdminsPage from "./pages/master-admin/PlatformAdminsPage";
 
 // Sub-Admin Pages
 import MyEarningsPage from "./pages/sub-admin/MyEarningsPage";
@@ -83,6 +91,9 @@ import SubAdminDashboard from "./pages/sub-admin/SubAdminDashboard";
 import SchoolAdminDashboard from "./pages/school-admin/SchoolAdminDashboard";
 import SchoolAdminDriversPage from "./pages/school-admin/SchoolAdminDriversPage";
 import SchoolAdminLiveTrackingPage from "./pages/school-admin/SchoolAdminLiveTrackingPage";
+import SchoolAdminBookingsPage from "./pages/school-admin/SchoolAdminBookingsPage";
+import SchoolAdminPaymentsPage from "./pages/school-admin/SchoolAdminPaymentsPage";
+import SchoolAdminProfilePage from "./pages/school-admin/SchoolAdminProfilePage";
 
 // Vehicles / Reports / Performance
 import VehiclesPage, { SchoolAdminVehiclesPage } from "./pages/vehicles/VehiclesPage";
@@ -246,9 +257,9 @@ const AppRoutes = () => {
       <Route
         path="/students"
         element={
-          <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
             <Students />
-          </ProtectedRoute>
+          </RoleBasedRoute>
         }
       />
       <Route
@@ -302,17 +313,17 @@ const AppRoutes = () => {
       <Route
         path="/route-ordering"
         element={
-          <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
             <RouteOrderingPage />
-          </ProtectedRoute>
+          </RoleBasedRoute>
         }
       />
       <Route
         path="/route-ordering/:driverId/:schoolId"
         element={
-          <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
             <RouteOrderingDetailPage />
-          </ProtectedRoute>
+          </RoleBasedRoute>
         }
       />
       <Route
@@ -326,9 +337,9 @@ const AppRoutes = () => {
       <Route
         path="/trip-schedules"
         element={
-          <ProtectedRoute>
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
             <TripSchedulesPage />
-          </ProtectedRoute>
+          </RoleBasedRoute>
         }
       />
       <Route
@@ -448,6 +459,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/master-admin/platform-admins"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin"]}>
+            <PlatformAdminsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/master-admin/school-admins"
         element={
           <RoleBasedRoute allowedRoles={["master_admin"]}>
@@ -534,6 +553,78 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["school_admin"]}>
             <SchoolAdminPerformancePage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/students"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminStudentsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/students/:id"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminStudentDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/route-ordering"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminRouteOrderingPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/route-ordering/:driverId/:schoolId"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminRouteOrderingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/trip-schedules"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminTripSchedulesPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/bookings"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminBookingsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/bookings/:bookingId"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminBookingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/payments"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminPaymentsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/school"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminProfilePage />
           </RoleBasedRoute>
         }
       />

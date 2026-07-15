@@ -41,8 +41,10 @@ export interface UpsertScheduleInput {
 /**
  * Get all trip schedules with driver and school names
  */
-export async function getAllTripSchedules(): Promise<TripSchedule[]> {
-  const { data, error } = await supabase
+export async function getAllTripSchedules(options?: {
+  schoolId?: number;
+}): Promise<TripSchedule[]> {
+  let query = supabase
     .from("driver_trip_schedules")
     .select(
       `
@@ -56,8 +58,13 @@ export async function getAllTripSchedules(): Promise<TripSchedule[]> {
         name
       )
     `
-    )
-    .order("created_at", { ascending: false });
+    );
+
+  if (options?.schoolId != null) {
+    query = query.eq("school_id", options.schoolId);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) throw error;
 
@@ -266,8 +273,11 @@ export async function getAlertsByDateRange(
 /**
  * Get alerts for a specific date
  */
-export async function getAlertsByDate(date: string): Promise<TripStartAlert[]> {
-  const { data, error } = await supabase
+export async function getAlertsByDate(
+  date: string,
+  options?: { schoolId?: number }
+): Promise<TripStartAlert[]> {
+  let query = supabase
     .from("trip_start_alerts")
     .select(
       `
@@ -282,8 +292,13 @@ export async function getAlertsByDate(date: string): Promise<TripStartAlert[]> {
       )
     `
     )
-    .eq("alert_date", date)
-    .order("alert_sent_at", { ascending: false });
+    .eq("alert_date", date);
+
+  if (options?.schoolId != null) {
+    query = query.eq("school_id", options.schoolId);
+  }
+
+  const { data, error } = await query.order("alert_sent_at", { ascending: false });
 
   if (error) throw error;
 

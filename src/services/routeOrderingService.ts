@@ -40,8 +40,10 @@ export interface DriverSchoolRouteSummary {
 /**
  * Get all driver-school combinations for the admin list view
  */
-export async function getAllDriverSchoolRoutes(): Promise<DriverSchoolRouteSummary[]> {
-  const { data, error } = await supabase
+export async function getAllDriverSchoolRoutes(options?: {
+  schoolId?: number;
+}): Promise<DriverSchoolRouteSummary[]> {
+  let query = supabase
     .from("bookings")
     .select(
       `
@@ -59,6 +61,12 @@ export async function getAllDriverSchoolRoutes(): Promise<DriverSchoolRouteSumma
     )
     .eq("status", "confirmed")
     .eq("booking_type", "monthly");
+
+  if (options?.schoolId != null) {
+    query = query.eq("school_id", options.schoolId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 

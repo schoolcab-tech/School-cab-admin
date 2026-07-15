@@ -31,12 +31,22 @@ import {
   Sunset,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 type OrderType = "pickup" | "drop";
 
-export default function RouteOrderingDetailPage() {
+export interface RouteOrderingDetailContentProps {
+  readOnly?: boolean;
+  listPath?: string;
+  linkedSchoolId?: number;
+}
+
+export function RouteOrderingDetailContent({
+  readOnly = false,
+  listPath = "/route-ordering",
+  linkedSchoolId,
+}: RouteOrderingDetailContentProps) {
   const { driverId, schoolId } = useParams<{
     driverId: string;
     schoolId: string;
@@ -46,6 +56,14 @@ export default function RouteOrderingDetailPage() {
 
   const driverIdNum = parseInt(driverId || "0");
   const schoolIdNum = parseInt(schoolId || "0");
+
+  if (
+    linkedSchoolId != null &&
+    schoolIdNum > 0 &&
+    schoolIdNum !== linkedSchoolId
+  ) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   const {
     data: route,
@@ -156,44 +174,75 @@ export default function RouteOrderingDetailPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   if (error || !route) {
     return (
-      <DashboardLayout>
-        <div className="space-y-6">
-          <Button variant="outline" onClick={() => navigate("/route-ordering")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Routes
-          </Button>
-          <Card>
-            <CardContent className="py-8">
-              <div className="text-center text-destructive">
-                {error?.message || "Route not found"}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
+      <div className="space-y-6">
+        <Button variant="outline" onClick={() => navigate(listPath)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Routes
+        </Button>
+        <Card>
+          <CardContent className="py-8">
+            <div className="text-center text-destructive">
+              {error?.message || "Route not found"}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
+  const studentListItem = (student: StudentRouteOrder, index: number) => (
+    <div
+      key={student.student_id}
+      className="p-4 rounded-lg border bg-card border-border"
+    >
+      <div className="flex items-center gap-4">
+        {!readOnly && <GripVertical className="h-5 w-5 text-muted-foreground" />}
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+          {index + 1}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium truncate">{student.student_name}</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {student.student_class && <span>Class {student.student_class}</span>}
+            {student.student_section && <span>- {student.student_section}</span>}
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+            <MapPin className="h-3 w-3" />
+            <span className="truncate">
+              {orderType === "pickup"
+                ? student.pickup_address
+                : student.drop_address}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {tripAssignments[student.student_id] && (
+            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+              {tripAssignments[student.student_id]}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/route-ordering")}
+              onClick={() => navigate(listPath)}
               className="mb-2"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -233,36 +282,46 @@ export default function RouteOrderingDetailPage() {
                   Drop-off Order
                 </Button>
               </div>
-              <Button
-                variant="secondary"
-                onClick={handleAutoOptimize}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                Auto-Optimize Route
-              </Button>
+              {!readOnly && (
+                <Button
+                  variant="secondary"
+                  onClick={handleAutoOptimize}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Auto-Optimize Route
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="mb-4 flex items-center gap-2">
               <Route className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">
-                {orderType === "pickup"
-                  ? "Drag and drop to set the order students will be picked up in the morning"
-                  : "Drag and drop to set the order students will be dropped off after school"}
+                {readOnly
+                  ? orderType === "pickup"
+                    ? "Pickup order for students on this route"
+                    : "Drop-off order for students on this route"
+                  : orderType === "pickup"
+                    ? "Drag and drop to set the order students will be picked up in the morning"
+                    : "Drag and drop to set the order students will be dropped off after school"}
               </span>
-              {isSaving && (
+              {!readOnly && isSaving && (
                 <Badge variant="secondary" className="ml-2">
                   Saving...
                 </Badge>
               )}
             </div>
 
-            {/* Draggable Student List */}
+            {readOnly ? (
+              <div className="space-y-2">
+                {students.map((student, index) => studentListItem(student, index))}
+              </div>
+            ) : (
             <DragDropContext onDragEnd={handleDragEnd}>
               <Droppable droppableId="students">
                 {(provided) => (
@@ -346,6 +405,7 @@ export default function RouteOrderingDetailPage() {
                 )}
               </Droppable>
             </DragDropContext>
+            )}
 
             {students.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
@@ -406,6 +466,26 @@ export default function RouteOrderingDetailPage() {
           </CardContent>
         </Card>
       </div>
+  );
+}
+
+export default function RouteOrderingDetailPage() {
+  return (
+    <DashboardLayout>
+      <RouteOrderingDetailContent />
+    </DashboardLayout>
+  );
+}
+
+export function SchoolAdminRouteOrderingDetailPage() {
+  const { linkedSchoolId } = useAuth();
+  return (
+    <DashboardLayout>
+      <RouteOrderingDetailContent
+        readOnly
+        listPath="/school-admin/route-ordering"
+        linkedSchoolId={linkedSchoolId ?? undefined}
+      />
     </DashboardLayout>
   );
 }

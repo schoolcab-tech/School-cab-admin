@@ -61,9 +61,20 @@ import { useDrivers } from "@/hooks/useDrivers";
 
 interface StudentsTableProps {
   statusTab?: "all" | "active" | "inactive";
+  /** When set, only show students for this school and hide school filter. */
+  schoolId?: number;
+  /** Hide write actions (assign, edit, status toggle). */
+  readOnly?: boolean;
+  /** Base path for student detail links. Default: /students */
+  detailBasePath?: string;
 }
 
-export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
+export function StudentsTable({
+  statusTab = "all",
+  schoolId,
+  readOnly = false,
+  detailBasePath = "/students",
+}: StudentsTableProps) {
   const navigate = useNavigate();
   const { user, userRole } = useAuth();
 
@@ -92,7 +103,7 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
     isLoading,
     error,
     refetch,
-  } = useStudents();
+  } = useStudents(schoolId);
   const { data: drivers = [] } = useDrivers();
   const { mutate: updateStatus } = useUpdateStudentStatus();
   const { mutate: assignDriver } = useAssignDriver();
@@ -347,10 +358,12 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <CardTitle>Students Directory</CardTitle>
-            <Button onClick={() => navigate("/students/new")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Student
-            </Button>
+            {!readOnly && (
+              <Button onClick={() => navigate("/students/new")}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Student
+              </Button>
+            )}
           </div>
 
           {/* Search + Filters */}
@@ -377,19 +390,21 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
               <Filter className="h-4 w-4 text-muted-foreground" />
 
               {/* School filter */}
-              <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue placeholder="All Schools" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Schools</SelectItem>
-                  {filterOptions.schools.map((school) => (
-                    <SelectItem key={school} value={school!}>
-                      {school}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!schoolId && (
+                <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectValue placeholder="All Schools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Schools</SelectItem>
+                    {filterOptions.schools.map((school) => (
+                      <SelectItem key={school} value={school!}>
+                        {school}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Status filter (hidden when tab controls status) */}
               {statusTab === "all" && (
@@ -449,7 +464,7 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
           </div>
 
           {/* Bulk action bar */}
-          {selectedIds.size > 0 && (
+          {!readOnly && selectedIds.size > 0 && (
             <div className="flex items-center gap-3 mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <Users className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">
@@ -474,14 +489,16 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allFilteredSelected && filteredStudents.length > 0}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </TableHead>
+                {!readOnly && (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allFilteredSelected && filteredStudents.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                )}
                 <TableHead>Student Details</TableHead>
-                <TableHead>School</TableHead>
+                {!schoolId && <TableHead>School</TableHead>}
                 <TableHead>Contact</TableHead>
                 <TableHead>Pickup Details</TableHead>
                 <TableHead>Location</TableHead>
@@ -500,12 +517,14 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
                       : undefined
                   }
                 >
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(student.student_id)}
-                      onCheckedChange={() => toggleSelect(student.student_id)}
-                    />
-                  </TableCell>
+                  {!readOnly && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(student.student_id)}
+                        onCheckedChange={() => toggleSelect(student.student_id)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="text-sm">
                       <div className="font-medium">{student.name}</div>
@@ -514,14 +533,16 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="font-medium">{student.schools?.name}</div>
-                      <div className="text-muted-foreground">
-                        {student.schools?.address || ""}
+                  {!schoolId && (
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium">{student.schools?.name}</div>
+                        <div className="text-muted-foreground">
+                          {student.schools?.address || ""}
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="text-sm">
                       <div className="flex items-center space-x-1">
@@ -587,31 +608,41 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={student.status === "active"}
-                        onCheckedChange={(checked) =>
-                          handleStatusToggle(student, checked)
-                        }
-                      />
+                    {readOnly ? (
                       <Badge
                         variant={
                           student.status === "active" ? "default" : "secondary"
                         }
                       >
-                        {student.status === "active" ? (
-                          <div className="flex items-center space-x-1">
-                            <CheckCircle className="h-3 w-3" />
-                            <span>Active</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-1">
-                            <XCircle className="h-3 w-3" />
-                            <span>Inactive</span>
-                          </div>
-                        )}
+                        {student.status === "active" ? "Active" : "Inactive"}
                       </Badge>
-                    </div>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={student.status === "active"}
+                          onCheckedChange={(checked) =>
+                            handleStatusToggle(student, checked)
+                          }
+                        />
+                        <Badge
+                          variant={
+                            student.status === "active" ? "default" : "secondary"
+                          }
+                        >
+                          {student.status === "active" ? (
+                            <div className="flex items-center space-x-1">
+                              <CheckCircle className="h-3 w-3" />
+                              <span>Active</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-1">
+                              <XCircle className="h-3 w-3" />
+                              <span>Inactive</span>
+                            </div>
+                          )}
+                        </Badge>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
@@ -619,27 +650,31 @@ export function StudentsTable({ statusTab = "all" }: StudentsTableProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() =>
-                          navigate(`/students/${student.student_id}`)
+                          navigate(`${detailBasePath}/${student.student_id}`)
                         }
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          navigate(`/students/${student.student_id}/edit`)
-                        }
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openReassignDialog(student)}
-                      >
-                        <UserCog className="h-4 w-4" />
-                      </Button>
+                      {!readOnly && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              navigate(`${detailBasePath}/${student.student_id}/edit`)
+                            }
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openReassignDialog(student)}
+                          >
+                            <UserCog className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

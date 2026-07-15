@@ -211,6 +211,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           suspended = !schoolAdmin?.is_active;
           schoolId = schoolAdmin?.school_id ?? null;
         }
+      } else if (isUserMasterAdmin || roleStr === 'admin') {
+        const { data: platformAdmin } = await (supabase as any)
+          .from('platform_admins')
+          .select('is_active')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (platformAdmin && !platformAdmin.is_active) {
+          suspended = true;
+        }
       }
 
       setIsAdmin(isUserAdmin);

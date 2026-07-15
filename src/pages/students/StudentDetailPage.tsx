@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/auth-context";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft,
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 
 type StudentDetail = {
   student_id: number;
@@ -36,19 +37,23 @@ type StudentDetail = {
   school_name: string;
 };
 
-export default function StudentDetailPage() {
-  return (
-    <DashboardLayout>
-      <StudentDetailContent />
-    </DashboardLayout>
-  );
+export interface StudentDetailContentProps {
+  readOnly?: boolean;
+  listPath?: string;
+  /** When set, redirect if student belongs to another school. */
+  linkedSchoolId?: number;
 }
 
-function StudentDetailContent() {
+export function StudentDetailContent({
+  readOnly = false,
+  listPath = "/students",
+  linkedSchoolId,
+}: StudentDetailContentProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<StudentDetail | null>(null);
+  const [unauthorized, setUnauthorized] = useState(false);
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -68,20 +73,29 @@ function StudentDetailContent() {
 
         if (error) throw error;
 
+        if (linkedSchoolId != null && data.school_id !== linkedSchoolId) {
+          setUnauthorized(true);
+          return;
+        }
+
         setStudent({
           ...data,
           school_name: data.schools?.name || "Unknown",
         });
       } catch (error: any) {
         toast.error("Failed to load student: " + error.message);
-        navigate("/students");
+        navigate(listPath);
       } finally {
         setLoading(false);
       }
     };
 
     fetchStudent();
-  }, [id, navigate]);
+  }, [id, navigate, listPath, linkedSchoolId]);
+
+  if (unauthorized) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   if (loading) {
     return (
@@ -99,11 +113,7 @@ function StudentDetailContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/students")}
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate(listPath)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -114,14 +124,15 @@ function StudentDetailContent() {
             <p className="text-muted-foreground">Student Details</p>
           </div>
         </div>
-        <Button onClick={() => navigate(`/students/${id}/edit`)}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit Student
-        </Button>
+        {!readOnly && (
+          <Button onClick={() => navigate(`${listPath}/${id}/edit`)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit Student
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Basic Information */}
         <Card>
           <CardHeader>
             <CardTitle>Basic Information</CardTitle>
@@ -153,7 +164,6 @@ function StudentDetailContent() {
           </CardContent>
         </Card>
 
-        {/* School Information */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -173,7 +183,6 @@ function StudentDetailContent() {
           </CardContent>
         </Card>
 
-        {/* Pickup Details */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -200,7 +209,6 @@ function StudentDetailContent() {
           </CardContent>
         </Card>
 
-        {/* Drop Details */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -228,5 +236,26 @@ function StudentDetailContent() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function StudentDetailPage() {
+  return (
+    <DashboardLayout>
+      <StudentDetailContent />
+    </DashboardLayout>
+  );
+}
+
+export function SchoolAdminStudentDetailPage() {
+  const { linkedSchoolId } = useAuth();
+  return (
+    <DashboardLayout>
+      <StudentDetailContent
+        readOnly
+        listPath="/school-admin/students"
+        linkedSchoolId={linkedSchoolId ?? undefined}
+      />
+    </DashboardLayout>
   );
 }

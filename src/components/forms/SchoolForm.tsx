@@ -109,6 +109,8 @@ interface SchoolFormProps {
   onSubmit: (data: CreateSchoolInput | UpdateSchoolInput) => Promise<void>;
   isLoading?: boolean;
   isEdit?: boolean;
+  /** School admin profile: hide code/status, lock name. */
+  profileMode?: boolean;
 }
 
 export function SchoolForm({
@@ -116,6 +118,7 @@ export function SchoolForm({
   onSubmit,
   isLoading = false,
   isEdit = false,
+  profileMode = false,
 }: SchoolFormProps) {
   const { toast } = useToast();
   const [selectedCoordinates, setSelectedCoordinates] = useState<{
@@ -296,13 +299,19 @@ export function SchoolForm({
                 <FormItem>
                   <FormLabel>School Name *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter school name" {...field} />
+                    <Input
+                      placeholder="Enter school name"
+                      {...field}
+                      disabled={profileMode}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {!profileMode && (
+              <>
             <FormField
               control={form.control}
               name="code"
@@ -341,6 +350,8 @@ export function SchoolForm({
                 </FormItem>
               )}
             />
+              </>
+            )}
           </div>
 
           {/* Contact Information */}

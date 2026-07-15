@@ -6,10 +6,10 @@ import {
 import { useSimpleMutation } from "./useSimpleMutation";
 import { useSimpleQuery } from "./useSimpleQuery";
 
-export const useStudents = () => {
+export const useStudents = (schoolId?: number) => {
   return useSimpleQuery(
-    () => getStudents(),
-    []
+    () => getStudents(schoolId != null ? { schoolId } : undefined),
+    [schoolId]
   );
 };
 

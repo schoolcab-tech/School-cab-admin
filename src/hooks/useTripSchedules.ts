@@ -16,10 +16,13 @@ import {
 import { useSimpleQuery } from "./useSimpleQuery";
 import { useSimpleMutation } from "./useSimpleMutation";
 
-export const useTripSchedules = () => {
+export const useTripSchedules = (schoolId?: number) => {
   return useSimpleQuery<TripSchedule[]>(
-    () => getAllTripSchedules(),
-    []
+    () =>
+      getAllTripSchedules(
+        schoolId != null ? { schoolId } : undefined
+      ),
+    [schoolId]
   );
 };
 
@@ -82,10 +85,14 @@ export const useTodayAlerts = () => {
   );
 };
 
-export const useAlertsByDate = (date: string) => {
+export const useAlertsByDate = (date: string, schoolId?: number) => {
   return useSimpleQuery<TripStartAlert[]>(
-    () => getAlertsByDate(date),
-    [date],
+    () =>
+      getAlertsByDate(
+        date,
+        schoolId != null ? { schoolId } : undefined
+      ),
+    [date, schoolId],
     { enabled: !!date }
   );
 };

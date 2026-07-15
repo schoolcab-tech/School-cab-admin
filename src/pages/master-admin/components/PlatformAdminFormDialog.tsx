@@ -24,8 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateSchoolAdmin } from "@/hooks/useSchoolAdmins";
-import { useSchools } from "@/hooks/useSchools";
+import { useCreatePlatformAdmin } from "@/hooks/usePlatformAdmins";
+import type { PlatformAdminRole } from "@/services/platformAdminService";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import * as z from "zod";
 
 const schema = z.object({
-  school_id: z.string().min(1, "Please select a school"),
+  role: z.enum(["admin", "master_admin"]),
   contact_person: z.string().min(2, "Contact person name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
@@ -48,19 +48,13 @@ interface Props {
   onCreated?: () => void;
 }
 
-export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) {
-  const createMutation = useCreateSchoolAdmin();
-  // getSchools returns { data, count, page, limit, totalPages }. Pass a high limit
-  // to fetch all schools in one go for the dropdown.
-  const { data: schoolsResult } = useSchools({ limit: 1000, page: 1 } as any);
-  const schools: any[] = Array.isArray(schoolsResult)
-    ? schoolsResult
-    : (schoolsResult as any)?.data ?? [];
+export function PlatformAdminFormDialog({ open, onOpenChange, onCreated }: Props) {
+  const createMutation = useCreatePlatformAdmin();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      school_id: "",
+      role: "admin",
       contact_person: "",
       email: "",
       phone: "",
@@ -71,18 +65,18 @@ export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) 
   const onSubmit = async (data: FormValues) => {
     try {
       await createMutation.mutateAsync({
-        school_id: parseInt(data.school_id),
+        role: data.role as PlatformAdminRole,
         contact_person: data.contact_person,
         email: data.email,
         phone: data.phone,
         password: data.password,
       });
-      toast.success("School admin created successfully");
-      form.reset();
+      toast.success("Platform admin created successfully");
+      form.reset({ role: "admin", contact_person: "", email: "", phone: "", password: "" });
       onOpenChange(false);
       onCreated?.();
     } catch (error: any) {
-      toast.error("Failed to create school admin: " + error.message);
+      toast.error("Failed to create platform admin: " + error.message);
     }
   };
 
@@ -90,9 +84,10 @@ export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New School Admin</DialogTitle>
+          <DialogTitle>Add Platform Admin</DialogTitle>
           <DialogDescription>
-            Create a principal / school admin account. They will get a school-scoped portal to view students, bookings, payments, routes, schedules, drivers, live tracking, reports, and edit their school profile.
+            Create an admin or master admin account for your team. They can log in with the email
+            and temporary password you set here.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,24 +95,27 @@ export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="school_id"
+              name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>School *</FormLabel>
+                  <FormLabel>Role *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a school" />
+                        <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {schools.map((s: any) => (
-                        <SelectItem key={s.id ?? s.school_id} value={String(s.id ?? s.school_id)}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="admin">Admin — full platform access</SelectItem>
+                      <SelectItem value="master_admin">
+                        Master Admin — includes fleet owners, school admins, audit
+                      </SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormDescription>
+                    Master admins can create other admins. Regular admins cannot access master-only
+                    pages.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -159,7 +157,7 @@ export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) 
                 <FormItem>
                   <FormLabel>Email *</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="admin@school.com" {...field} />
+                    <Input type="email" placeholder="admin@yourcompany.com" {...field} />
                   </FormControl>
                   <FormDescription>Used for login</FormDescription>
                   <FormMessage />
@@ -176,7 +174,7 @@ export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) 
                   <FormControl>
                     <Input type="password" placeholder="At least 6 characters" {...field} />
                   </FormControl>
-                  <FormDescription>The admin can change this after first login</FormDescription>
+                  <FormDescription>Share this with the new admin for their first login</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -200,7 +198,7 @@ export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) 
                     Creating...
                   </>
                 ) : (
-                  "Create School Admin"
+                  "Create Platform Admin"
                 )}
               </Button>
             </DialogFooter>

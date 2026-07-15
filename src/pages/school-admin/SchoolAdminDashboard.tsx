@@ -114,7 +114,7 @@ function SchoolAdminDashboardContent() {
           {profile?.school_name || "School Dashboard"}
         </h1>
         <p className="text-muted-foreground">
-          Welcome, {profile?.contact_person ?? "admin"}. Overview of drivers and operations for your school.
+          Welcome, {profile?.contact_person ?? "admin"}. Overview of students, transport, and operations for your school.
         </p>
       </div>
 
@@ -168,6 +168,36 @@ function SchoolAdminDashboardContent() {
           </CardHeader>
           <CardContent className="space-y-2">
             <Button variant="outline" className="w-full justify-start" asChild>
+              <Link to="/school-admin/students">
+                <GraduationCap className="mr-2 h-4 w-4" />
+                View Students
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link to="/school-admin/bookings">
+                <MapPin className="mr-2 h-4 w-4" />
+                View Bookings
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link to="/school-admin/trip-schedules">
+                <Activity className="mr-2 h-4 w-4" />
+                Trip Schedules
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link to="/school-admin/payments">
+                <GraduationCap className="mr-2 h-4 w-4" />
+                Payments & Fees
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link to="/school-admin/school">
+                <School className="mr-2 h-4 w-4" />
+                School Profile
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-start" asChild>
               <Link to="/school-admin/drivers">
                 <Car className="mr-2 h-4 w-4" />
                 View Drivers
@@ -203,6 +233,9 @@ function SchoolAdminDashboardContent() {
               <span className="text-muted-foreground">Phone:</span>{" "}
               <span className="font-medium">{profile?.phone}</span>
             </div>
+            <Button variant="link" className="px-0 h-auto" asChild>
+              <Link to="/school-admin/school">Edit school profile</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

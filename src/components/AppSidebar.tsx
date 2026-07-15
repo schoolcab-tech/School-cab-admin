@@ -21,6 +21,7 @@ import {
   Clock,
   FileText,
   TrendingUp,
+  Shield,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -158,6 +159,12 @@ const navigationItems: NavItem[] = [
     roles: ['master_admin'],
   },
   {
+    title: "Platform Admins",
+    url: "/master-admin/platform-admins",
+    icon: Shield,
+    roles: ['master_admin'],
+  },
+  {
     title: "School Admins",
     url: "/master-admin/school-admins",
     icon: GraduationCap,
@@ -225,6 +232,42 @@ const navigationItems: NavItem[] = [
     title: "Dashboard",
     url: "/school-admin/dashboard",
     icon: LayoutDashboard,
+    roles: ['school_admin'],
+  },
+  {
+    title: "School Profile",
+    url: "/school-admin/school",
+    icon: Building2,
+    roles: ['school_admin'],
+  },
+  {
+    title: "Students",
+    url: "/school-admin/students",
+    icon: GraduationCap,
+    roles: ['school_admin'],
+  },
+  {
+    title: "Bookings",
+    url: "/school-admin/bookings",
+    icon: ClipboardList,
+    roles: ['school_admin'],
+  },
+  {
+    title: "Payments",
+    url: "/school-admin/payments",
+    icon: DollarSign,
+    roles: ['school_admin'],
+  },
+  {
+    title: "Route Ordering",
+    url: "/school-admin/route-ordering",
+    icon: Route,
+    roles: ['school_admin'],
+  },
+  {
+    title: "Trip Schedules",
+    url: "/school-admin/trip-schedules",
+    icon: Clock,
     roles: ['school_admin'],
   },
   {

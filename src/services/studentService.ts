@@ -283,8 +283,8 @@ export async function assignDriverToStudent(
 /**
  * Get all students with their details
  */
-export async function getStudents() {
-  const { data, error } = await supabase
+export async function getStudents(options?: { schoolId?: number }) {
+  let query = supabase
     .from("students")
     .select(
       `
@@ -304,8 +304,13 @@ export async function getStudents() {
         )
       )
     `
-    )
-    .order("created_at", { ascending: false });
+    );
+
+  if (options?.schoolId != null) {
+    query = query.eq("school_id", options.schoolId);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) throw new Error(`Error fetching students: ${error.message}`);
 

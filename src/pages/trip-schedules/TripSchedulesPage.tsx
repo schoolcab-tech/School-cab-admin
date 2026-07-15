@@ -63,50 +63,81 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-export default function TripSchedulesPage() {
+export interface TripSchedulesContentProps {
+  schoolId?: number;
+  readOnly?: boolean;
+}
+
+export function TripSchedulesContent({
+  schoolId,
+  readOnly = false,
+}: TripSchedulesContentProps) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("schedules");
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Clock className="h-8 w-8" />
-            Trip Schedules & Alerts
-          </h1>
-          <p className="text-muted-foreground">
-            Configure expected trip start times and monitor driver compliance.
-          </p>
-        </div>
-
-        <StatsCards />
-
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="schedules">Schedules</TabsTrigger>
-            <TabsTrigger value="alerts">Alerts</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="schedules" className="mt-4">
-            <SchedulesTab userId={user?.id || ""} />
-          </TabsContent>
-
-          <TabsContent value="alerts" className="mt-4">
-            <AlertsTab userId={user?.id || ""} />
-          </TabsContent>
-        </Tabs>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <Clock className="h-8 w-8" />
+          Trip Schedules & Alerts
+        </h1>
+        <p className="text-muted-foreground">
+          {readOnly
+            ? "View expected trip start times and driver compliance for your school."
+            : "Configure expected trip start times and monitor driver compliance."}
+        </p>
       </div>
+
+      <StatsCards schoolId={schoolId} />
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="alerts">Alerts</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="schedules" className="mt-4">
+          <SchedulesTab userId={user?.id || ""} schoolId={schoolId} readOnly={readOnly} />
+        </TabsContent>
+
+        <TabsContent value="alerts" className="mt-4">
+          <AlertsTab userId={user?.id || ""} schoolId={schoolId} readOnly={readOnly} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+export default function TripSchedulesPage() {
+  return (
+    <DashboardLayout>
+      <TripSchedulesContent />
+    </DashboardLayout>
+  );
+}
+
+export function SchoolAdminTripSchedulesPage() {
+  const { linkedSchoolId } = useAuth();
+  return (
+    <DashboardLayout>
+      {linkedSchoolId ? (
+        <TripSchedulesContent schoolId={linkedSchoolId} readOnly />
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          No school linked to your account.
+        </div>
+      )}
     </DashboardLayout>
   );
 }
 
 // ── Stats Cards ──────────────────────────────────────────────────────
 
-function StatsCards() {
-  const { data: schedules = [], isLoading: schedulesLoading } = useTripSchedules();
+function StatsCards({ schoolId }: { schoolId?: number }) {
+  const { data: schedules = [], isLoading: schedulesLoading } = useTripSchedules(schoolId);
   const todayStr = new Date().toISOString().split("T")[0];
-  const { data: alerts = [], isLoading: alertsLoading } = useAlertsByDate(todayStr);
+  const { data: alerts = [], isLoading: alertsLoading } = useAlertsByDate(todayStr, schoolId);
 
   const activeSchedules = schedules.filter((s) => s.is_active).length;
   const inactiveSchedules = schedules.filter((s) => !s.is_active).length;
@@ -188,8 +219,16 @@ function StatsCards() {
 
 // ── Schedules Tab ────────────────────────────────────────────────────
 
-function SchedulesTab({ userId }: { userId: string }) {
-  const { data: schedules = [], isLoading, error } = useTripSchedules();
+function SchedulesTab({
+  userId,
+  schoolId,
+  readOnly = false,
+}: {
+  userId: string;
+  schoolId?: number;
+  readOnly?: boolean;
+}) {
+  const { data: schedules = [], isLoading, error } = useTripSchedules(schoolId);
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<TripSchedule | null>(null);
@@ -247,10 +286,12 @@ function SchedulesTab({ userId }: { userId: string }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Driver Trip Schedules</CardTitle>
-          <Button onClick={handleAdd} size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Schedule
-          </Button>
+          {!readOnly && (
+            <Button onClick={handleAdd} size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Schedule
+            </Button>
+          )}
         </div>
         <div className="flex items-center space-x-2">
           <div className="relative flex-1 max-w-sm">
@@ -282,7 +323,7 @@ function SchedulesTab({ userId }: { userId: string }) {
                 <TableHead>Morning Time</TableHead>
                 <TableHead>Evening Time</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                {!readOnly && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -309,32 +350,34 @@ function SchedulesTab({ userId }: { userId: string }) {
                       <Badge variant="secondary">Inactive</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(schedule)}
-                        className="h-8 w-8 p-0"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleActive(schedule)}
-                        className="h-8 w-8 p-0"
-                        title={schedule.is_active ? "Deactivate" : "Activate"}
-                      >
-                        {schedule.is_active ? (
-                          <PowerOff className="h-4 w-4 text-destructive" />
-                        ) : (
-                          <Power className="h-4 w-4 text-green-600" />
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {!readOnly && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(schedule)}
+                          className="h-8 w-8 p-0"
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleActive(schedule)}
+                          className="h-8 w-8 p-0"
+                          title={schedule.is_active ? "Deactivate" : "Activate"}
+                        >
+                          {schedule.is_active ? (
+                            <PowerOff className="h-4 w-4 text-destructive" />
+                          ) : (
+                            <Power className="h-4 w-4 text-green-600" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -345,17 +388,21 @@ function SchedulesTab({ userId }: { userId: string }) {
           <div className="text-center py-8 text-muted-foreground">
             {searchTerm
               ? "No schedules found matching your search"
-              : "No trip schedules configured yet. Click \"Add Schedule\" to get started."}
+              : readOnly
+                ? "No trip schedules configured for your school yet."
+                : "No trip schedules configured yet. Click \"Add Schedule\" to get started."}
           </div>
         )}
       </CardContent>
 
-      <ScheduleDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        editingSchedule={editingSchedule}
-        userId={userId}
-      />
+      {!readOnly && (
+        <ScheduleDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          editingSchedule={editingSchedule}
+          userId={userId}
+        />
+      )}
     </Card>
   );
 }
@@ -552,11 +599,19 @@ interface DriverSummary {
   alerts: TripStartAlert[];
 }
 
-function AlertsTab({ userId }: { userId: string }) {
+function AlertsTab({
+  userId,
+  schoolId,
+  readOnly = false,
+}: {
+  userId: string;
+  schoolId?: number;
+  readOnly?: boolean;
+}) {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const { data: alerts = [], isLoading, error } = useAlertsByDate(selectedDate);
+  const { data: alerts = [], isLoading, error } = useAlertsByDate(selectedDate, schoolId);
   const updateStatusMutation = useUpdateAlertStatus();
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [resolvingAlert, setResolvingAlert] = useState<TripStartAlert | null>(null);
@@ -791,7 +846,9 @@ function AlertsTab({ userId }: { userId: string }) {
                           <TableHead>Expected Time</TableHead>
                           <TableHead>Alert Sent</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          {!readOnly && (
+                            <TableHead className="text-right">Actions</TableHead>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -815,40 +872,42 @@ function AlertsTab({ userId }: { userId: string }) {
                               })}
                             </TableCell>
                             <TableCell>{getStatusBadge(alert.status)}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {alert.status === "pending" && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleAcknowledge(alert)}
-                                    disabled={updateStatusMutation.isPending}
-                                  >
-                                    Acknowledge
-                                  </Button>
-                                )}
-                                {(alert.status === "pending" ||
-                                  alert.status === "acknowledged") && (
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={() => handleOpenResolve(alert)}
-                                    disabled={updateStatusMutation.isPending}
-                                  >
-                                    Resolve
-                                  </Button>
-                                )}
-                                {alert.notes && (
-                                  <span
-                                    className="text-xs text-muted-foreground ml-2"
-                                    title={alert.notes}
-                                  >
-                                    Note: {alert.notes.slice(0, 30)}
-                                    {alert.notes.length > 30 ? "..." : ""}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
+                            {!readOnly && (
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {alert.status === "pending" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleAcknowledge(alert)}
+                                      disabled={updateStatusMutation.isPending}
+                                    >
+                                      Acknowledge
+                                    </Button>
+                                  )}
+                                  {(alert.status === "pending" ||
+                                    alert.status === "acknowledged") && (
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => handleOpenResolve(alert)}
+                                      disabled={updateStatusMutation.isPending}
+                                    >
+                                      Resolve
+                                    </Button>
+                                  )}
+                                  {alert.notes && (
+                                    <span
+                                      className="text-xs text-muted-foreground ml-2"
+                                      title={alert.notes}
+                                    >
+                                      Note: {alert.notes.slice(0, 30)}
+                                      {alert.notes.length > 30 ? "..." : ""}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
                           </TableRow>
                         ))}
                       </TableBody>
@@ -861,50 +920,51 @@ function AlertsTab({ userId }: { userId: string }) {
         </CardContent>
       </Card>
 
-      {/* Resolve Dialog */}
-      <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Resolve Alert</DialogTitle>
-            <DialogDescription>
-              {resolvingAlert && (
-                <>
-                  Resolve the {resolvingAlert.alert_type} trip alert for{" "}
-                  <strong>{resolvingAlert.driver_name}</strong> at{" "}
-                  <strong>{resolvingAlert.school_name}</strong>.
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
+      {!readOnly && (
+        <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Resolve Alert</DialogTitle>
+              <DialogDescription>
+                {resolvingAlert && (
+                  <>
+                    Resolve the {resolvingAlert.alert_type} trip alert for{" "}
+                    <strong>{resolvingAlert.driver_name}</strong> at{" "}
+                    <strong>{resolvingAlert.school_name}</strong>.
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Notes (optional)</Label>
-              <Textarea
-                value={resolveNotes}
-                onChange={(e) => setResolveNotes(e.target.value)}
-                placeholder="e.g., Driver called in sick, substitute arranged..."
-                rows={3}
-              />
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Notes (optional)</Label>
+                <Textarea
+                  value={resolveNotes}
+                  onChange={(e) => setResolveNotes(e.target.value)}
+                  placeholder="e.g., Driver called in sick, substitute arranged..."
+                  rows={3}
+                />
+              </div>
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setResolveDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleResolve} disabled={updateStatusMutation.isPending}>
-              {updateStatusMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Resolve Alert
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setResolveDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleResolve} disabled={updateStatusMutation.isPending}>
+                {updateStatusMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Resolve Alert
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Driver History Dialog */}
       {selectedDriverId && (

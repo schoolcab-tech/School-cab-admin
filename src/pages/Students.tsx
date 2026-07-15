@@ -3,6 +3,7 @@ import { StudentsTable } from "@/components/tables/StudentsTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/auth-context";
 import { useStudents } from "@/hooks/useStudents";
 import { Student } from "@/types/student";
 import { Download, Plus, RefreshCw, Upload } from "lucide-react";
@@ -75,9 +76,19 @@ function exportStudentsToCSV(students: Student[]) {
   URL.revokeObjectURL(url);
 }
 
-export default function Students() {
+export interface StudentsContentProps {
+  schoolId?: number;
+  readOnly?: boolean;
+  detailBasePath?: string;
+}
+
+export function StudentsContent({
+  schoolId,
+  readOnly = false,
+  detailBasePath = "/students",
+}: StudentsContentProps) {
   const navigate = useNavigate();
-  const { data: students = [] } = useStudents();
+  const { data: students = [] } = useStudents(schoolId);
   const [activeTab, setActiveTab] = useState("all");
 
   const totalStudents = students.length;
@@ -85,17 +96,19 @@ export default function Students() {
   const withoutDrivers = students.filter((s) => !s.assigned_driver).length;
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Students Management
-            </h1>
-            <p className="text-muted-foreground">
-              Manage student profiles, school assignments, and driver allocations.
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {schoolId ? "Students" : "Students Management"}
+          </h1>
+          <p className="text-muted-foreground">
+            {schoolId
+              ? "View enrolled students and their transport assignments."
+              : "Manage student profiles, school assignments, and driver allocations."}
+          </p>
+        </div>
+        {!readOnly && (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -118,70 +131,114 @@ export default function Students() {
               Add Student
             </Button>
           </div>
+        )}
+        {readOnly && (
+          <Button
+            variant="outline"
+            onClick={() => exportStudentsToCSV(students)}
+            disabled={students.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        )}
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="flex justify-between">
+          <TabsList>
+            <TabsTrigger value="all">All Students</TabsTrigger>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="inactive">Inactive</TabsTrigger>
+          </TabsList>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <div className="flex justify-between">
-            <TabsList>
-              <TabsTrigger value="all">All Students</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="inactive">Inactive</TabsTrigger>
-            </TabsList>
-          </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalStudents}</div>
+              <p className="text-xs text-muted-foreground">
+                {schoolId ? "Enrolled at your school" : "From all schools and grades"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Students</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeStudents}</div>
+              <p className="text-xs text-muted-foreground">Currently in active status</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Without Drivers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{withoutDrivers}</div>
+              <p className="text-xs text-muted-foreground">
+                Students awaiting driver assignment
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Students
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalStudents}</div>
-                <p className="text-xs text-muted-foreground">
-                  From all schools and grades
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Active Students
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activeStudents}</div>
-                <p className="text-xs text-muted-foreground">
-                  Currently in active status
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Without Drivers
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{withoutDrivers}</div>
-                <p className="text-xs text-muted-foreground">
-                  Students awaiting driver assignment
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="all" className="mt-0">
+          <StudentsTable
+            statusTab="all"
+            schoolId={schoolId}
+            readOnly={readOnly}
+            detailBasePath={detailBasePath}
+          />
+        </TabsContent>
+        <TabsContent value="active" className="mt-0">
+          <StudentsTable
+            statusTab="active"
+            schoolId={schoolId}
+            readOnly={readOnly}
+            detailBasePath={detailBasePath}
+          />
+        </TabsContent>
+        <TabsContent value="inactive" className="mt-0">
+          <StudentsTable
+            statusTab="inactive"
+            schoolId={schoolId}
+            readOnly={readOnly}
+            detailBasePath={detailBasePath}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
-          <TabsContent value="all" className="mt-0">
-            <StudentsTable statusTab="all" />
-          </TabsContent>
-          <TabsContent value="active" className="mt-0">
-            <StudentsTable statusTab="active" />
-          </TabsContent>
-          <TabsContent value="inactive" className="mt-0">
-            <StudentsTable statusTab="inactive" />
-          </TabsContent>
-        </Tabs>
-      </div>
+export default function Students() {
+  return (
+    <DashboardLayout>
+      <StudentsContent />
+    </DashboardLayout>
+  );
+}
+
+export function SchoolAdminStudentsPage() {
+  const { linkedSchoolId } = useAuth();
+  return (
+    <DashboardLayout>
+      {linkedSchoolId ? (
+        <StudentsContent
+          schoolId={linkedSchoolId}
+          readOnly
+          detailBasePath="/school-admin/students"
+        />
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          No school linked to your account.
+        </div>
+      )}
     </DashboardLayout>
   );
 }
