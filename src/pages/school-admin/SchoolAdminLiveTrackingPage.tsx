@@ -1,7 +1,8 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { DriverOperationsView } from "@/components/tracking/DriverOperationsView";
+import { LiveTrackingTabs } from "@/components/tracking/LiveTrackingTabs";
 import { useAuth } from "@/contexts/auth-context";
 import { useMySchoolAdmin } from "@/hooks/useSchoolAdmins";
+import { useSchool } from "@/hooks/useSchools";
 import { Activity, MapPin } from "lucide-react";
 
 export default function SchoolAdminLiveTrackingPage() {
@@ -15,6 +16,7 @@ export default function SchoolAdminLiveTrackingPage() {
 function Content() {
   const { linkedSchoolId } = useAuth();
   const { data: profile } = useMySchoolAdmin();
+  const { data: school } = useSchool(linkedSchoolId ? String(linkedSchoolId) : "");
 
   if (!linkedSchoolId) {
     return (
@@ -23,6 +25,9 @@ function Content() {
       </div>
     );
   }
+
+  const schoolLat = school?.latitude ?? null;
+  const schoolLng = school?.longitude ?? null;
 
   return (
     <div className="space-y-6">
@@ -33,13 +38,22 @@ function Content() {
         </h1>
         <p className="text-muted-foreground flex items-center gap-1">
           <MapPin className="h-3 w-3" />
-          Showing vehicles serving <strong>{profile?.school_name ?? "your school"}</strong> with live
-          coordinates and pickup stops. Click a driver for full tracking. Updates every 15 seconds.
+          Vehicles serving <strong>{profile?.school_name ?? "your school"}</strong> — table view or
+          live map. Updates every 15 seconds.
         </p>
       </div>
 
-      <DriverOperationsView
+      <LiveTrackingTabs
         schoolId={linkedSchoolId}
+        schoolCenter={
+          schoolLat != null && schoolLng != null && profile?.school_name
+            ? {
+                latitude: Number(schoolLat),
+                longitude: Number(schoolLng),
+                name: profile.school_name,
+              }
+            : null
+        }
         detailPathPrefix="/school-admin/live-tracking"
         refetchInterval={15000}
       />

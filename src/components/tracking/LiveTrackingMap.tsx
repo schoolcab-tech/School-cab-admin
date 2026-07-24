@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 /* ── Marker icons ─────────────────────────────────────────────────── */
 
@@ -51,7 +52,7 @@ function makeDriverIcon(status: "online" | "on_trip" | "inactive", selected = fa
   const bg = selected ? COLORS.selected : COLORS[status];
   const ring = selected ? "3px solid #fbbf24" : "2px solid white";
   return new L.DivIcon({
-    className: "",
+    className: "leaflet-custom-marker",
     html: `<div style="position:relative;">
       <div style="display:flex;align-items:center;justify-content:center;width:${selected ? 36 : 30}px;height:${selected ? 36 : 30}px;border-radius:50%;background:${bg};border:${ring};box-shadow:0 2px 6px rgba(0,0,0,.4);">
         <svg width="${selected ? 18 : 16}" height="${selected ? 18 : 16}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
@@ -78,7 +79,7 @@ function makeStopIcon(stop: TripStop) {
       : COLORS.drop;
   const label = stop.stop_type === "pickup" ? "P" : "D";
   return new L.DivIcon({
-    className: "",
+    className: "leaflet-custom-marker",
     html: `<div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:${bg};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.35);font-size:10px;font-weight:700;color:white;">${label}</div>`,
     iconSize: [24, 24],
     iconAnchor: [12, 12],
@@ -126,6 +127,7 @@ function PanToDriver({ driver }: { driver: DriverLiveLocation | null }) {
 export interface LiveTrackingMapProps {
   schoolId?: number;
   schoolCenter?: { latitude: number; longitude: number; name: string } | null;
+  detailPathPrefix?: string;
   refetchInterval?: number;
 }
 
@@ -138,6 +140,7 @@ const driverDisplayStatus = (d: DriverLiveLocation): "online" | "on_trip" | "ina
 export function LiveTrackingMap({
   schoolId,
   schoolCenter,
+  detailPathPrefix,
   refetchInterval = 15000,
 }: LiveTrackingMapProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
@@ -396,6 +399,11 @@ export function LiveTrackingMap({
           trip={selectedTrip}
           stops={visibleStops.filter((s) => s.driver_id === selectedDriverId)}
           stopsLoading={stopsLoading && selectedDriverId != null}
+          detailPath={
+            detailPathPrefix && selectedDriverId != null
+              ? `${detailPathPrefix}/${selectedDriverId}`
+              : undefined
+          }
           onClose={() => setSelectedDriverId(null)}
         />
       </div>
@@ -482,12 +490,14 @@ function DriverDetailPanel({
   trip,
   stops,
   stopsLoading,
+  detailPath,
   onClose,
 }: {
   driver: DriverLiveLocation | null;
   trip: ActiveTripForTracking | undefined;
   stops: TripStop[];
   stopsLoading: boolean;
+  detailPath?: string;
   onClose: () => void;
 }) {
   if (!driver) {
@@ -599,6 +609,12 @@ function DriverDetailPanel({
             <span className="text-muted-foreground">Phone: </span>
             <span className="font-medium">{driver.phone}</span>
           </div>
+        )}
+
+        {detailPath && (
+          <Button variant="default" size="sm" className="w-full" asChild>
+            <Link to={detailPath}>Open full tracking</Link>
+          </Button>
         )}
       </CardContent>
     </Card>
