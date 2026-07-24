@@ -2,7 +2,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 import {
+  useDeleteDriver,
   useDriver,
   useDriverAssignedStudents,
   useDriverEarnings,
@@ -22,6 +25,7 @@ import {
   MapPin,
   Phone,
   Star,
+  Trash2,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -33,6 +37,10 @@ import { DriverDocumentsSection } from "./DriverDocumentsSection";
 export function DriverDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { userRole, isMasterAdmin } = useAuth();
+  const canDeleteDriver =
+    isMasterAdmin || (userRole as string | null) === "admin";
 
   const { data: driver, isLoading: loadingDriver } = useDriver(id!);
   const { data: stats, isLoading: loadingStats } = useDriverStats(id!);
@@ -43,6 +51,7 @@ export function DriverDetail() {
   } = useDriverEarnings(id!);
   const { data: assignedStudents, isLoading: loadingStudents } =
     useDriverAssignedStudents(id!);
+  const deleteDriver = useDeleteDriver();
 
   console.log("Driver ID:", id);
   console.log("Loading earnings:", loadingEarnings);
@@ -79,6 +88,32 @@ export function DriverDetail() {
     earnings ? Object.keys(earnings) : "no earnings"
   );
 
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${driver.name || "this driver"}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteDriver.mutateAsync(id!);
+      toast({
+        title: "Success",
+        description: "Driver deleted successfully",
+      });
+      navigate("/drivers");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to delete driver",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -97,10 +132,26 @@ export function DriverDetail() {
             </p>
           </div>
         </div>
-        <Button onClick={() => navigate(`/drivers/${id}/edit`)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Driver
-        </Button>
+        <div className="flex items-center gap-2">
+          {canDeleteDriver && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteDriver.isPending}
+            >
+              {deleteDriver.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete Driver
+            </Button>
+          )}
+          <Button onClick={() => navigate(`/drivers/${id}/edit`)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Driver
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

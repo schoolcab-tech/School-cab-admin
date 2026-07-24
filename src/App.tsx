@@ -74,10 +74,12 @@ import AddCashPaymentPage from "./pages/master-admin/AddCashPaymentPage";
 import BulkCashPaymentPage from "./pages/master-admin/BulkCashPaymentPage";
 import AuditTrailPage from "./pages/master-admin/AuditTrailPage";
 import DriverRequestsPage from "./pages/master-admin/DriverRequestsPage";
+import DriverDeleteRequestsPage from "./pages/master-admin/DriverDeleteRequestsPage";
 import EarningsPage from "./pages/master-admin/EarningsPage";
 import FleetMappingPage from "./pages/master-admin/FleetMappingPage";
 import FleetOwnersPage from "./pages/master-admin/FleetOwnersPage";
 import LiveTrackingPage from "./pages/master-admin/LiveTrackingPage";
+import DriverTrackingDetailPage from "./pages/tracking/DriverTrackingDetailPage";
 import SchoolAdminsPage from "./pages/master-admin/SchoolAdminsPage";
 import PlatformAdminsPage from "./pages/master-admin/PlatformAdminsPage";
 
@@ -427,6 +429,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/master-admin/driver-delete-requests"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
+            <DriverDeleteRequestsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/master-admin/audit-trail"
         element={
           <RoleBasedRoute allowedRoles={["master_admin"]}>
@@ -483,6 +493,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/master-admin/live-tracking/:driverId"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
+            <DriverTrackingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/vehicles"
         element={
           <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
@@ -529,6 +547,14 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["school_admin"]}>
             <SchoolAdminLiveTrackingPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/school-admin/live-tracking/:driverId"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <DriverTrackingDetailPage />
           </RoleBasedRoute>
         }
       />

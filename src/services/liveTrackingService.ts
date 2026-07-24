@@ -213,10 +213,11 @@ export async function getActiveTripsForTracking(opts?: {
 
 /**
  * Fetch pickup/drop stops for one or more active trip sessions.
+ * Falls back to student profile coordinates when trip_students coords are empty.
  */
 export async function getTripStopsForSessions(
   tripSessionIds: number[],
-  opts?: { driverIds?: number[] }
+  opts?: { driverIds?: number[]; sessionDriverMap?: Map<number, number> }
 ): Promise<TripStop[]> {
   if (tripSessionIds.length === 0) return [];
 
@@ -228,7 +229,13 @@ export async function getTripStopsForSessions(
       pickup_latitude, pickup_longitude, drop_latitude, drop_longitude,
       pickup_order, drop_order, pickup_status, drop_status,
       pickup_time, drop_time,
-      students!trip_students_student_id_fkey ( name ),
+      students!trip_students_student_id_fkey (
+        name,
+        pickup_latitude,
+        pickup_longitude,
+        drop_latitude,
+        drop_longitude
+      ),
       trip_sessions!trip_students_trip_session_id_fkey ( driver_id, trip_type )
     `
     )
@@ -240,13 +247,22 @@ export async function getTripStopsForSessions(
   const stops: TripStop[] = [];
 
   for (const row of data || []) {
-    const driverId = row.trip_sessions?.driver_id;
-    if (driverIdSet && driverId != null && !driverIdSet.has(driverId)) continue;
+    const driverId =
+      row.trip_sessions?.driver_id ??
+      opts?.sessionDriverMap?.get(row.trip_session_id) ??
+      0;
+    if (driverIdSet && driverId && !driverIdSet.has(driverId)) continue;
 
     const tripType = (row.trip_sessions?.trip_type || "").toLowerCase();
     const studentName = row.students?.name || `Student ${row.student_id}`;
+    const student = row.students;
 
-    if (row.pickup_latitude != null && row.pickup_longitude != null) {
+    const pickupLat = row.pickup_latitude ?? student?.pickup_latitude;
+    const pickupLng = row.pickup_longitude ?? student?.pickup_longitude;
+    const dropLat = row.drop_latitude ?? student?.drop_latitude;
+    const dropLng = row.drop_longitude ?? student?.drop_longitude;
+
+    if (pickupLat != null && pickupLng != null && isValidCoord(Number(pickupLat), Number(pickupLng))) {
       stops.push({
         trip_student_id: row.trip_student_id,
         trip_session_id: row.trip_session_id,
@@ -254,8 +270,8 @@ export async function getTripStopsForSessions(
         student_id: row.student_id,
         student_name: studentName,
         stop_type: "pickup",
-        latitude: Number(row.pickup_latitude),
-        longitude: Number(row.pickup_longitude),
+        latitude: Number(pickupLat),
+        longitude: Number(pickupLng),
         order: row.pickup_order ?? 0,
         status: row.pickup_status || "scheduled",
         completed_at: row.pickup_time,
@@ -263,8 +279,9 @@ export async function getTripStopsForSessions(
     }
 
     if (
-      row.drop_latitude != null &&
-      row.drop_longitude != null &&
+      dropLat != null &&
+      dropLng != null &&
+      isValidCoord(Number(dropLat), Number(dropLng)) &&
       (tripType.includes("drop") || row.drop_order != null)
     ) {
       stops.push({
@@ -274,8 +291,8 @@ export async function getTripStopsForSessions(
         student_id: row.student_id,
         student_name: studentName,
         stop_type: "drop",
-        latitude: Number(row.drop_latitude),
-        longitude: Number(row.drop_longitude),
+        latitude: Number(dropLat),
+        longitude: Number(dropLng),
         order: row.drop_order ?? 0,
         status: row.drop_status || "scheduled",
         completed_at: row.drop_time,
@@ -290,6 +307,152 @@ export async function getTripStopsForSessions(
   });
 }
 
+function isValidCoord(lat: number, lng: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180 &&
+    !(lat === 0 && lng === 0)
+  );
+}
+
+/** Planned route from driver_trip_students when no live trip_students coords exist. */
+async function getPlannedRouteStopsForDrivers(
+  entries: Array<{ driver_id: number; school_id: number; trip_type: string | null }>
+): Promise<Map<number, TripStop[]>> {
+  const result = new Map<number, TripStop[]>();
+  if (entries.length === 0) return result;
+
+  const driverIds = [...new Set(entries.map((e) => e.driver_id))];
+  const { data: trips, error: tripsError } = await db
+    .from("driver_trips")
+    .select("driver_trip_id, driver_id, school_id")
+    .in("driver_id", driverIds)
+    .eq("is_active", true);
+
+  if (tripsError || !trips?.length) return result;
+
+  const entryKey = (driverId: number, schoolId: number) => `${driverId}:${schoolId}`;
+  const wanted = new Set(entries.map((e) => entryKey(e.driver_id, e.school_id)));
+
+  const tripIds: number[] = [];
+  const tripMeta = new Map<number, { driver_id: number; school_id: number }>();
+  for (const trip of trips) {
+    if (!wanted.has(entryKey(trip.driver_id, trip.school_id))) continue;
+    tripIds.push(trip.driver_trip_id);
+    tripMeta.set(trip.driver_trip_id, {
+      driver_id: trip.driver_id,
+      school_id: trip.school_id,
+    });
+  }
+
+  if (tripIds.length === 0) return result;
+
+  const { data: assignments, error: assignError } = await db
+    .from("driver_trip_students")
+    .select(
+      `
+      driver_trip_student_id,
+      driver_trip_id,
+      student_id,
+      pickup_order,
+      drop_order,
+      students (
+        name,
+        pickup_latitude,
+        pickup_longitude,
+        drop_latitude,
+        drop_longitude
+      )
+    `
+    )
+    .in("driver_trip_id", tripIds)
+    .eq("is_active", true);
+
+  if (assignError || !assignments?.length) return result;
+
+  const tripTypeByDriver = new Map(entries.map((e) => [entryKey(e.driver_id, e.school_id), e.trip_type]));
+
+  for (const row of assignments) {
+    const meta = tripMeta.get(row.driver_trip_id);
+    if (!meta) continue;
+    const tripType = (
+      tripTypeByDriver.get(entryKey(meta.driver_id, meta.school_id)) || ""
+    ).toLowerCase();
+    const student = row.students;
+    const studentName = student?.name || `Student ${row.student_id}`;
+    const list = result.get(meta.driver_id) || [];
+
+    if (
+      student?.pickup_latitude != null &&
+      student?.pickup_longitude != null &&
+      isValidCoord(Number(student.pickup_latitude), Number(student.pickup_longitude))
+    ) {
+      list.push({
+        trip_student_id: row.driver_trip_student_id,
+        trip_session_id: 0,
+        driver_id: meta.driver_id,
+        student_id: row.student_id,
+        student_name: studentName,
+        stop_type: "pickup",
+        latitude: Number(student.pickup_latitude),
+        longitude: Number(student.pickup_longitude),
+        order: row.pickup_order ?? list.filter((s) => s.stop_type === "pickup").length + 1,
+        status: "scheduled",
+        completed_at: null,
+      });
+    }
+
+    if (
+      student?.drop_latitude != null &&
+      student?.drop_longitude != null &&
+      isValidCoord(Number(student.drop_latitude), Number(student.drop_longitude)) &&
+      (tripType.includes("drop") || row.drop_order != null)
+    ) {
+      list.push({
+        trip_student_id: row.driver_trip_student_id,
+        trip_session_id: 0,
+        driver_id: meta.driver_id,
+        student_id: row.student_id,
+        student_name: studentName,
+        stop_type: "drop",
+        latitude: Number(student.drop_latitude),
+        longitude: Number(student.drop_longitude),
+        order: row.drop_order ?? list.filter((s) => s.stop_type === "drop").length + 1,
+        status: "scheduled",
+        completed_at: null,
+      });
+    }
+
+    result.set(meta.driver_id, list);
+  }
+
+  for (const [driverId, list] of result) {
+    result.set(
+      driverId,
+      list.sort((a, b) => {
+        if (a.stop_type !== b.stop_type) return a.stop_type === "pickup" ? -1 : 1;
+        return a.order - b.order;
+      })
+    );
+  }
+
+  return result;
+}
+
+/** Order stops for map route line (pickups then drops, each by order). */
+export function orderStopsForRoute(stops: TripStop[], tripType?: string | null): TripStop[] {
+  const isDropTrip = (tripType || "").toLowerCase().includes("drop");
+  if (isDropTrip) {
+    const drops = stops.filter((s) => s.stop_type === "drop").sort((a, b) => a.order - b.order);
+    if (drops.length > 0) return drops;
+  }
+  const pickups = stops.filter((s) => s.stop_type === "pickup").sort((a, b) => a.order - b.order);
+  const drops = stops.filter((s) => s.stop_type === "drop").sort((a, b) => a.order - b.order);
+  return [...pickups, ...drops];
+}
+
 /** Convenience: active trips keyed by driver_id */
 export function indexTripsByDriver(
   trips: ActiveTripForTracking[]
@@ -299,4 +462,332 @@ export function indexTripsByDriver(
     if (trip.driver_id != null) map.set(trip.driver_id, trip);
   }
   return map;
+}
+
+export type DriverTripPhase =
+  | "inactive"
+  | "online"
+  | "on_trip"
+  | "completed_today";
+
+export type DriverOperationRow = {
+  driver_id: number;
+  driver_name: string;
+  cab_number: string;
+  phone: string | null;
+  vehicle_type: string;
+  cab_capacity: number;
+  is_verified: boolean;
+  is_live: boolean;
+  status: string;
+  phase: DriverTripPhase;
+  latitude: number | null;
+  longitude: number | null;
+  last_seen_at: string | null;
+  minutes_since_last_seen: number | null;
+  speed: number | null;
+  battery_level: number | null;
+  eta_minutes: number | null;
+  eta_distance_km: number | null;
+  student_etas: Record<string, number> | null;
+  active_trip: ActiveTripForTracking | null;
+  trip_type: string | null;
+  trip_progress: string | null;
+  trip_started_at: string | null;
+  school_id: number | null;
+  school_name: string | null;
+  picked_up_count: number;
+  dropped_count: number;
+  total_students: number;
+  pending_pickups: number;
+  pending_drops: number;
+  last_pickup_student: string | null;
+  last_pickup_at: string | null;
+  next_student_name: string | null;
+  next_stop_type: "pickup" | "drop" | null;
+  next_eta_minutes: number | null;
+  completed_trips_today: number;
+  stops: TripStop[];
+};
+
+function countPendingStops(stops: TripStop[]): { pending_pickups: number; pending_drops: number } {
+  const isPending = (s: TripStop) =>
+    !["picked_up", "dropped", "completed", "cancelled", "absent"].includes(s.status);
+  return {
+    pending_pickups: stops.filter((s) => s.stop_type === "pickup" && isPending(s)).length,
+    pending_drops: stops.filter((s) => s.stop_type === "drop" && isPending(s)).length,
+  };
+}
+
+function buildDriverOperationRow(
+  v: {
+    driver_id: number;
+    driver_name: string;
+    cab_number: string;
+    phone: string | null;
+    vehicle_type: string;
+    cab_capacity: number;
+    is_verified: boolean;
+    is_live: boolean;
+    latitude: number | null;
+    longitude: number | null;
+    status: string | null;
+    last_seen_at: string | null;
+    battery_level: number | null;
+  },
+  live: DriverLiveLocation | undefined,
+  trip: ActiveTripForTracking | null,
+  stops: TripStop[],
+  completedTripsToday: number
+): DriverOperationRow {
+  const isLive = live?.is_live ?? v.is_live;
+  const status = live?.status || v.status || "offline";
+  const phase = derivePhase(isLive, status, !!trip, completedTripsToday);
+  const { name: lastPickupStudent, at: lastPickupAt } = findLastPickup(stops);
+  const next = findNextStop(
+    stops,
+    trip?.trip_type ?? null,
+    live?.student_etas ?? null,
+    live?.eta_minutes ?? null
+  );
+  const { pending_pickups, pending_drops } = countPendingStops(stops);
+
+  const picked = trip?.picked_up_count ?? 0;
+  const dropped = trip?.dropped_count ?? 0;
+  const total = trip?.total_students ?? 0;
+  let tripProgress: string | null = null;
+  if (trip) {
+    tripProgress = `${picked}/${total} picked • ${dropped} dropped • ${pending_pickups} pending pickup`;
+  } else if (completedTripsToday > 0) {
+    tripProgress = `${completedTripsToday} trip(s) completed today`;
+  }
+
+  const lastSeen = live?.last_seen_at ?? v.last_seen_at;
+  const minutesSince = lastSeen
+    ? (Date.now() - new Date(lastSeen).getTime()) / 60000
+    : live?.minutes_since_last_seen ?? null;
+
+  return {
+    driver_id: v.driver_id,
+    driver_name: v.driver_name,
+    cab_number: v.cab_number,
+    phone: v.phone,
+    vehicle_type: v.vehicle_type,
+    cab_capacity: v.cab_capacity,
+    is_verified: v.is_verified,
+    is_live: isLive,
+    status,
+    phase,
+    latitude: live?.latitude ?? v.latitude,
+    longitude: live?.longitude ?? v.longitude,
+    last_seen_at: lastSeen,
+    minutes_since_last_seen: minutesSince,
+    speed: live?.speed ?? null,
+    battery_level: live?.battery_level ?? v.battery_level,
+    eta_minutes: live?.eta_minutes ?? null,
+    eta_distance_km: live?.eta_distance_km ?? null,
+    student_etas: live?.student_etas ?? null,
+    active_trip: trip,
+    trip_type: trip?.trip_type ?? null,
+    trip_progress: tripProgress,
+    trip_started_at: trip?.actual_start_time ?? null,
+    school_id: trip?.school_id ?? null,
+    school_name: trip?.school_name ?? null,
+    picked_up_count: picked,
+    dropped_count: dropped,
+    total_students: total,
+    pending_pickups,
+    pending_drops,
+    last_pickup_student: lastPickupStudent,
+    last_pickup_at: lastPickupAt,
+    next_student_name: next.name,
+    next_stop_type: next.stop_type,
+    next_eta_minutes: next.eta_minutes,
+    completed_trips_today: completedTripsToday,
+    stops,
+  };
+}
+function derivePhase(
+  isLive: boolean,
+  status: string | null,
+  hasActiveTrip: boolean,
+  completedTripsToday: number
+): DriverTripPhase {
+  if (hasActiveTrip || (isLive && status === "on_trip")) return "on_trip";
+  if (completedTripsToday > 0 && !hasActiveTrip) return "completed_today";
+  if (isLive) return "online";
+  return "inactive";
+}
+
+function findLastPickup(stops: TripStop[]): { name: string | null; at: string | null } {
+  const pickups = stops
+    .filter((s) => s.stop_type === "pickup" && s.status === "picked_up" && s.completed_at)
+    .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime());
+  if (pickups.length === 0) return { name: null, at: null };
+  return { name: pickups[0].student_name, at: pickups[0].completed_at };
+}
+
+function findNextStop(
+  stops: TripStop[],
+  tripType: string | null,
+  studentEtas: Record<string, number> | null,
+  fallbackEta: number | null
+): {
+  name: string | null;
+  stop_type: "pickup" | "drop" | null;
+  eta_minutes: number | null;
+} {
+  const isDropTrip = (tripType || "").toLowerCase().includes("drop");
+  const primaryType: "pickup" | "drop" = isDropTrip ? "drop" : "pickup";
+  const pending = stops
+    .filter(
+      (s) =>
+        s.stop_type === primaryType &&
+        !["picked_up", "dropped", "completed", "cancelled", "absent"].includes(s.status)
+    )
+    .sort((a, b) => a.order - b.order);
+
+  if (pending.length === 0) {
+    const altType = primaryType === "pickup" ? "drop" : "pickup";
+    const altPending = stops
+      .filter(
+        (s) =>
+          s.stop_type === altType &&
+          !["picked_up", "dropped", "completed", "cancelled", "absent"].includes(s.status)
+      )
+      .sort((a, b) => a.order - b.order);
+    if (altPending.length === 0) {
+      return { name: null, stop_type: null, eta_minutes: fallbackEta };
+    }
+    const next = altPending[0];
+    const eta =
+      studentEtas?.[String(next.student_id)] ??
+      studentEtas?.[next.student_id] ??
+      fallbackEta;
+    return { name: next.student_name, stop_type: next.stop_type, eta_minutes: eta ?? null };
+  }
+
+  const next = pending[0];
+  const eta =
+    studentEtas?.[String(next.student_id)] ??
+    studentEtas?.[next.student_id] ??
+    fallbackEta;
+  return { name: next.student_name, stop_type: next.stop_type, eta_minutes: eta ?? null };
+}
+
+async function getCompletedTripsTodayByDriver(opts?: {
+  schoolId?: number;
+}): Promise<Map<number, number>> {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  let query = db
+    .from("trip_sessions")
+    .select("driver_id, status, actual_end_time, updated_at")
+    .eq("status", "completed")
+    .gte("actual_end_time", todayStart.toISOString());
+
+  if (opts?.schoolId != null) {
+    query = query.eq("school_id", opts.schoolId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    let fallback = db
+      .from("trip_sessions")
+      .select("driver_id, status, updated_at")
+      .eq("status", "completed")
+      .gte("updated_at", todayStart.toISOString());
+    if (opts?.schoolId != null) fallback = fallback.eq("school_id", opts.schoolId);
+    const { data: fbData, error: fbError } = await fallback;
+    if (fbError) return new Map();
+    const map = new Map<number, number>();
+    for (const row of fbData || []) {
+      if (row.driver_id == null) continue;
+      map.set(row.driver_id, (map.get(row.driver_id) || 0) + 1);
+    }
+    return map;
+  }
+
+  const map = new Map<number, number>();
+  for (const row of data || []) {
+    if (row.driver_id == null) continue;
+    map.set(row.driver_id, (map.get(row.driver_id) || 0) + 1);
+  }
+  return map;
+}
+
+/**
+ * Unified driver operations rows: all fleet drivers + live trip/pickup/ETA context.
+ */
+export async function getDriverOperationsOverview(opts?: {
+  schoolId?: number;
+}): Promise<DriverOperationRow[]> {
+  const { getAllVehicles } = await import("./vehicleService");
+
+  const [vehicles, liveLocations, activeTrips, completedTodayMap] = await Promise.all([
+    getAllVehicles(opts?.schoolId != null ? { schoolId: opts.schoolId } : undefined),
+    getLiveDriverLocations(opts),
+    getActiveTripsForTracking(opts),
+    getCompletedTripsTodayByDriver(opts),
+  ]);
+
+  const liveByDriver = new Map(liveLocations.map((d) => [d.driver_id, d]));
+  const tripsByDriver = indexTripsByDriver(activeTrips);
+  const tripSessionIds = activeTrips.map((t) => t.trip_session_id);
+  const sessionDriverMap = new Map(
+    activeTrips.map((t) => [t.trip_session_id, t.driver_id])
+  );
+  const allStops =
+    tripSessionIds.length > 0
+      ? await getTripStopsForSessions(tripSessionIds, { sessionDriverMap })
+      : [];
+
+  const stopsByDriver = new Map<number, TripStop[]>();
+  for (const stop of allStops) {
+    if (!stop.driver_id) continue;
+    const list = stopsByDriver.get(stop.driver_id) || [];
+    list.push(stop);
+    stopsByDriver.set(stop.driver_id, list);
+  }
+
+  const needsPlanned: Array<{ driver_id: number; school_id: number; trip_type: string | null }> =
+    [];
+  for (const v of vehicles) {
+    const trip = tripsByDriver.get(v.driver_id) ?? null;
+    const existing = stopsByDriver.get(v.driver_id) || [];
+    if (existing.length === 0) {
+      const schoolId = trip?.school_id ?? opts?.schoolId ?? null;
+      if (schoolId != null) {
+        needsPlanned.push({
+          driver_id: v.driver_id,
+          school_id: schoolId,
+          trip_type: trip?.trip_type ?? null,
+        });
+      }
+    }
+  }
+
+  const plannedStops = await getPlannedRouteStopsForDrivers(needsPlanned);
+  for (const [driverId, planned] of plannedStops) {
+    if (!stopsByDriver.has(driverId) || stopsByDriver.get(driverId)!.length === 0) {
+      stopsByDriver.set(driverId, planned);
+    }
+  }
+
+  return vehicles.map((v) => {
+    const live = liveByDriver.get(v.driver_id);
+    const trip = tripsByDriver.get(v.driver_id) ?? null;
+    const stops = stopsByDriver.get(v.driver_id) || [];
+    const completedTripsToday = completedTodayMap.get(v.driver_id) || 0;
+    return buildDriverOperationRow(v, live, trip, stops, completedTripsToday);
+  });
+}
+
+export async function getDriverOperationById(
+  driverId: number,
+  opts?: { schoolId?: number }
+): Promise<DriverOperationRow | null> {
+  const rows = await getDriverOperationsOverview(opts);
+  return rows.find((r) => r.driver_id === driverId) ?? null;
 }

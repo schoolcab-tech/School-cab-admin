@@ -22,6 +22,7 @@ import {
   FileText,
   TrendingUp,
   Shield,
+  Trash2,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -193,6 +194,12 @@ const navigationItems: NavItem[] = [
     url: "/master-admin/driver-requests",
     icon: ClipboardList,
     roles: ['master_admin'],
+  },
+  {
+    title: "Driver Delete Requests",
+    url: "/master-admin/driver-delete-requests",
+    icon: Trash2,
+    roles: ['master_admin', 'admin'],
   },
   {
     title: "Audit Trail",

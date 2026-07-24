@@ -281,6 +281,153 @@ export async function assignDriverToStudent(
 }
 
 /**
+ * Delete a student and related transport records (bookings, payments, trips, etc.).
+ * Leaves the parent auth user intact (a parent may have other students).
+ */
+export async function deleteStudent(
+  studentId: number,
+  adminUserId?: string,
+  adminRole?: AppRole
+) {
+  const { data: student, error: studentFetchError } = await supabase
+    .from("students")
+    .select("student_id, name, school_id, user_id")
+    .eq("student_id", studentId)
+    .single();
+
+  if (studentFetchError) {
+    throw new Error(`Error fetching student: ${studentFetchError.message}`);
+  }
+  if (!student) throw new Error("Student not found");
+
+  const { data: bookings, error: bookingsError } = await supabase
+    .from("bookings")
+    .select("booking_id")
+    .eq("student_id", studentId);
+
+  if (bookingsError) {
+    throw new Error(`Error fetching student bookings: ${bookingsError.message}`);
+  }
+
+  const bookingIds = (bookings || []).map((b) => b.booking_id);
+
+  if (bookingIds.length > 0) {
+    const { error: subscriptionPaymentsError } = await supabase
+      .from("subscription_payments")
+      .delete()
+      .in("booking_id", bookingIds);
+    if (subscriptionPaymentsError) {
+      throw new Error(
+        `Error deleting subscription payments: ${subscriptionPaymentsError.message}`
+      );
+    }
+
+    const { error: paymentsError } = await supabase
+      .from("payments")
+      .delete()
+      .in("booking_id", bookingIds);
+    if (paymentsError) {
+      throw new Error(`Error deleting payments: ${paymentsError.message}`);
+    }
+
+    const { error: cyclesError } = await supabase
+      .from("subscription_cycles")
+      .delete()
+      .in("booking_id", bookingIds);
+    if (cyclesError) {
+      throw new Error(
+        `Error deleting subscription cycles: ${cyclesError.message}`
+      );
+    }
+  }
+
+  // Tables not always present in generated types — cast where needed
+  const db = supabase as any;
+
+  const { error: tripStudentsError } = await db
+    .from("trip_students")
+    .delete()
+    .eq("student_id", studentId);
+  if (tripStudentsError) {
+    throw new Error(`Error deleting trip students: ${tripStudentsError.message}`);
+  }
+
+  const { error: driverTripStudentsError } = await db
+    .from("driver_trip_students")
+    .delete()
+    .eq("student_id", studentId);
+  if (driverTripStudentsError) {
+    throw new Error(
+      `Error deleting driver trip students: ${driverTripStudentsError.message}`
+    );
+  }
+
+  const { error: bookingRequestsError } = await supabase
+    .from("booking_requests")
+    .delete()
+    .eq("student_id", studentId);
+  if (bookingRequestsError) {
+    throw new Error(
+      `Error deleting booking requests: ${bookingRequestsError.message}`
+    );
+  }
+
+  const { error: unservicedError } = await supabase
+    .from("unserviced_requests")
+    .delete()
+    .eq("student_id", studentId);
+  if (unservicedError) {
+    throw new Error(
+      `Error deleting unserviced requests: ${unservicedError.message}`
+    );
+  }
+
+  if (bookingIds.length > 0) {
+    const { error: deleteBookingsError } = await supabase
+      .from("bookings")
+      .delete()
+      .eq("student_id", studentId);
+    if (deleteBookingsError) {
+      throw new Error(`Error deleting bookings: ${deleteBookingsError.message}`);
+    }
+  }
+
+  const { error: deleteStudentError } = await supabase
+    .from("students")
+    .delete()
+    .eq("student_id", studentId);
+
+  if (deleteStudentError) {
+    throw new Error(`Error deleting student: ${deleteStudentError.message}`);
+  }
+
+  if (adminUserId && adminRole) {
+    try {
+      await createAuditLog(
+        adminUserId,
+        adminRole,
+        "delete_student",
+        "student",
+        studentId,
+        {
+          student_id: student.student_id,
+          name: student.name,
+          school_id: student.school_id,
+          user_id: student.user_id,
+          booking_ids: bookingIds,
+        },
+        null,
+        `Deleted student ${student.name} (ID ${studentId})`
+      );
+    } catch (auditError) {
+      console.error("Failed to create audit log for student delete:", auditError);
+    }
+  }
+
+  return true;
+}
+
+/**
  * Get all students with their details
  */
 export async function getStudents(options?: { schoolId?: number }) {

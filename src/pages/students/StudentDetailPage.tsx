@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/auth-context";
+import { useDeleteStudent } from "@/hooks/useStudents";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft,
@@ -14,6 +15,7 @@ import {
   GraduationCap,
   User,
   Building2,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -51,9 +53,15 @@ export function StudentDetailContent({
 }: StudentDetailContentProps) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, userRole, isMasterAdmin, isSchoolAdmin } = useAuth();
+  const deleteStudentMutation = useDeleteStudent();
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
+  const canDeleteStudent =
+    isMasterAdmin ||
+    isSchoolAdmin ||
+    (userRole as string | null) === "admin";
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -109,6 +117,28 @@ export function StudentDetailContent({
     return <div>Student not found</div>;
   }
 
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${student.name}? This will also remove their bookings and related records. This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteStudentMutation.mutateAsync({
+        studentId: student.student_id,
+        adminUserId: user?.id,
+        adminRole: userRole || undefined,
+      });
+      toast.success("Student deleted successfully");
+      navigate(listPath);
+    } catch (error: any) {
+      toast.error("Failed to delete student: " + (error?.message || "Unknown error"));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -124,12 +154,28 @@ export function StudentDetailContent({
             <p className="text-muted-foreground">Student Details</p>
           </div>
         </div>
-        {!readOnly && (
-          <Button onClick={() => navigate(`${listPath}/${id}/edit`)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Student
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canDeleteStudent && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteStudentMutation.isPending}
+            >
+              {deleteStudentMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete Student
+            </Button>
+          )}
+          {!readOnly && (
+            <Button onClick={() => navigate(`${listPath}/${id}/edit`)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Student
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

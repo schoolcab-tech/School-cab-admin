@@ -43,6 +43,7 @@ import {
   Phone,
   Plus,
   Search,
+  Trash2,
   User,
   UserCog,
   Users,
@@ -56,6 +57,7 @@ import {
   useStudents,
   useUpdateStudentStatus,
   useAssignDriver,
+  useDeleteStudent,
 } from "@/hooks/useStudents";
 import { useDrivers } from "@/hooks/useDrivers";
 
@@ -76,7 +78,12 @@ export function StudentsTable({
   detailBasePath = "/students",
 }: StudentsTableProps) {
   const navigate = useNavigate();
-  const { user, userRole } = useAuth();
+  const { user, userRole, isMasterAdmin, isSchoolAdmin } = useAuth();
+  const canDeleteStudent =
+    isMasterAdmin ||
+    isSchoolAdmin ||
+    (userRole as string | null) === "admin";
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // ── Filter state ──
   const [searchTerm, setSearchTerm] = useState("");
@@ -107,6 +114,45 @@ export function StudentsTable({
   const { data: drivers = [] } = useDrivers();
   const { mutate: updateStatus } = useUpdateStudentStatus();
   const { mutate: assignDriver } = useAssignDriver();
+  const deleteStudentMutation = useDeleteStudent();
+
+  const handleDeleteStudent = async (student: Student) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${student.name}? This will also remove their bookings and related records. This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingId(student.student_id);
+    try {
+      await deleteStudentMutation.mutateAsync({
+        studentId: student.student_id,
+        adminUserId: user?.id,
+        adminRole: userRole || undefined,
+      });
+      toast({
+        title: "Success",
+        description: "Student deleted successfully",
+      });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(student.student_id);
+        return next;
+      });
+      await refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to delete student",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // ── Derive filter options from loaded data ──
   const filterOptions = useMemo(() => {
@@ -674,6 +720,22 @@ export function StudentsTable({
                             <UserCog className="h-4 w-4" />
                           </Button>
                         </>
+                      )}
+                      {canDeleteStudent && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteStudent(student)}
+                          disabled={deletingId === student.student_id}
+                          title="Delete student"
+                        >
+                          {deletingId === student.student_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
                       )}
                     </div>
                   </TableCell>

@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { LiveTrackingMap } from "@/components/tracking/LiveTrackingMap";
+import { DriverOperationsView } from "@/components/tracking/DriverOperationsView";
 import { Activity } from "lucide-react";
 
 export default function LiveTrackingPage() {
@@ -12,12 +12,15 @@ export default function LiveTrackingPage() {
             Live Vehicle Tracking
           </h1>
           <p className="text-muted-foreground">
-            Trace all drivers on one map with live coordinates, pickup/drop stops, and active trip
-            progress. Updates every 15 seconds.
+            Driver operations table with pickup/drop progress, ETAs, and filters. Click any driver
+            to open their full tracking page with map and activity timeline. Updates every 15 seconds.
           </p>
         </div>
 
-        <LiveTrackingMap refetchInterval={15000} />
+        <DriverOperationsView
+          detailPathPrefix="/master-admin/live-tracking"
+          refetchInterval={15000}
+        />
       </div>
     </DashboardLayout>
   );

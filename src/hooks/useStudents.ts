@@ -2,6 +2,7 @@ import {
   getStudents,
   updateStudentStatus,
   assignDriverToStudent,
+  deleteStudent,
 } from "@/services/studentService";
 import { useSimpleMutation } from "./useSimpleMutation";
 import { useSimpleQuery } from "./useSimpleQuery";
@@ -35,5 +36,19 @@ export const useAssignDriver = () => {
       adminUserId?: string;
       adminRole?: string;
     }) => assignDriverToStudent(studentId, driverId, schoolId, adminUserId, adminRole),
+  });
+};
+
+export const useDeleteStudent = () => {
+  return useSimpleMutation({
+    mutationFn: ({
+      studentId,
+      adminUserId,
+      adminRole,
+    }: {
+      studentId: number;
+      adminUserId?: string;
+      adminRole?: string;
+    }) => deleteStudent(studentId, adminUserId, adminRole as any),
   });
 };

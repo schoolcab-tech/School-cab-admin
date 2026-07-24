@@ -10,8 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import { useDrivers, useUpdateDriverStatus } from "@/hooks/useDrivers";
-import { Check, Edit, Eye, Loader2, Star, X } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  useDeleteDriver,
+  useDrivers,
+  useUpdateDriverStatus,
+} from "@/hooks/useDrivers";
+import { Check, Edit, Eye, Loader2, Star, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -35,11 +40,16 @@ export function DriversTable({
 }: DriversTableProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { userRole, isMasterAdmin } = useAuth();
+  const canDeleteDriver =
+    isMasterAdmin || (userRole as string | null) === "admin";
   const [searchTerm, setSearchTerm] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { mutate: updateStatus, isPending: isUpdatingStatus } =
     useUpdateDriverStatus();
+  const deleteDriver = useDeleteDriver();
 
-  const { data, isLoading, isFetching, error } = useDrivers({
+  const { data, isLoading, error, refetch } = useDrivers({
     ...filters,
     search: searchTerm || filters?.search,
   });
@@ -81,6 +91,35 @@ export function DriversTable({
       onEditDriver(id);
     } else {
       navigate(`/drivers/${id}/edit`);
+    }
+  };
+
+  const handleDelete = async (id: string, name?: string | null) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${name || "this driver"}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      await deleteDriver.mutateAsync(id);
+      toast({
+        title: "Success",
+        description: "Driver deleted successfully",
+      });
+      await refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to delete driver",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -260,6 +299,27 @@ export function DriversTable({
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
+                    {canDeleteDriver && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() =>
+                          handleDelete(
+                            driver.driver_id.toString(),
+                            driver.name
+                          )
+                        }
+                        disabled={deletingId === driver.driver_id.toString()}
+                        title="Delete driver"
+                      >
+                        {deletingId === driver.driver_id.toString() ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

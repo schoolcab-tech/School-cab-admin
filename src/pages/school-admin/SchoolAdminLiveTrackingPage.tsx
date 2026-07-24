@@ -1,9 +1,8 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { LiveTrackingMap } from "@/components/tracking/LiveTrackingMap";
+import { DriverOperationsView } from "@/components/tracking/DriverOperationsView";
 import { useAuth } from "@/contexts/auth-context";
 import { useMySchoolAdmin } from "@/hooks/useSchoolAdmins";
-import { useSchool } from "@/hooks/useSchools";
-import { Activity, Loader2, MapPin } from "lucide-react";
+import { Activity, MapPin } from "lucide-react";
 
 export default function SchoolAdminLiveTrackingPage() {
   return (
@@ -16,7 +15,6 @@ export default function SchoolAdminLiveTrackingPage() {
 function Content() {
   const { linkedSchoolId } = useAuth();
   const { data: profile } = useMySchoolAdmin();
-  const { data: school } = useSchool(linkedSchoolId ? String(linkedSchoolId) : "");
 
   if (!linkedSchoolId) {
     return (
@@ -25,10 +23,6 @@ function Content() {
       </div>
     );
   }
-
-  // School coords come from the school detail
-  const schoolLat = school?.latitude ?? null;
-  const schoolLng = school?.longitude ?? null;
 
   return (
     <div className="space-y-6">
@@ -40,21 +34,13 @@ function Content() {
         <p className="text-muted-foreground flex items-center gap-1">
           <MapPin className="h-3 w-3" />
           Showing vehicles serving <strong>{profile?.school_name ?? "your school"}</strong> with live
-          coordinates and pickup stops. Updates every 15 seconds.
+          coordinates and pickup stops. Click a driver for full tracking. Updates every 15 seconds.
         </p>
       </div>
 
-      <LiveTrackingMap
+      <DriverOperationsView
         schoolId={linkedSchoolId}
-        schoolCenter={
-          schoolLat != null && schoolLng != null && profile?.school_name
-            ? {
-                latitude: Number(schoolLat),
-                longitude: Number(schoolLng),
-                name: profile.school_name,
-              }
-            : null
-        }
+        detailPathPrefix="/school-admin/live-tracking"
         refetchInterval={15000}
       />
     </div>
