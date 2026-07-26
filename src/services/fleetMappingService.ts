@@ -13,6 +13,7 @@ export type DriverWithMapping = {
   vehicle_type: string;
   is_verified: boolean | null;
   avg_rating: number | null;
+  schools_serving?: number[] | null;
   mapping?: FleetCabMapping;
 };
 
@@ -40,7 +41,8 @@ export const getDriversByOwnerId = async (
         cab_capacity,
         vehicle_type,
         is_verified,
-        avg_rating
+        avg_rating,
+        schools_serving
       )
     `)
     .eq("owner_id", ownerId)

@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDriverServiceAreas } from "@/hooks/useDriverServiceAreas";
+import { ExportButton } from "@/components/ExportButton";
 import { Car, Loader2, MapPin, Search, Users } from "lucide-react";
 import { useState } from "react";
 
@@ -32,14 +33,31 @@ export default function RoutesPage() {
     pincode.includes(searchTerm)
   );
 
+  const exportRows = filteredPincodes.flatMap((pincode) =>
+    groupedAreas[pincode].map((area) => [
+      pincode,
+      area.drivers?.name || "",
+      area.drivers?.cab_number || "",
+      area.drivers?.vehicle_type || "",
+    ])
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Routes & Areas</h1>
-          <p className="text-muted-foreground">
-            Manage service areas, routes, and geographic coverage.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Routes & Areas</h1>
+            <p className="text-muted-foreground">
+              Manage service areas, routes, and geographic coverage.
+            </p>
+          </div>
+          <ExportButton
+            headers={["Pincode", "Driver Name", "Cab Number", "Area"]}
+            rows={exportRows}
+            filename={`routes-areas-${new Date().toISOString().split("T")[0]}`}
+            disabled={exportRows.length === 0}
+          />
         </div>
 
         {/* Service Areas Overview */}

@@ -8,16 +8,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ExportButton } from "@/components/ExportButton";
 import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useState, useEffect } from "react";
-import { Car, Download, Loader2, Phone, Star, User } from "lucide-react";
+import {
+  Car,
+  Loader2,
+  Route,
+  Star,
+  User,
+  UserCog,
+  ChevronDown,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { downloadCSV } from "@/lib/csvExport";
+import { useNavigate } from "react-router-dom";
+
+type DriverRoute = {
+  school_id: number;
+  school_name: string;
+};
 
 export default function MyFleetPage() {
   return (
@@ -28,6 +47,7 @@ export default function MyFleetPage() {
 }
 
 function MyFleetContent() {
+  const navigate = useNavigate();
   const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
   const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
     fleetOwner?.owner_id
@@ -37,6 +57,9 @@ function MyFleetContent() {
   const [driverStats, setDriverStats] = useState<
     Record<number, { students: number }>
   >({});
+  const [driverRoutes, setDriverRoutes] = useState<
+    Record<number, DriverRoute[]>
+  >({});
   const [loadingStats, setLoadingStats] = useState(false);
 
   useEffect(() => {
@@ -45,12 +68,18 @@ function MyFleetContent() {
 
       setLoadingStats(true);
       const stats: Record<number, { students: number }> = {};
+      const routes: Record<number, DriverRoute[]> = {};
 
       for (const driver of drivers) {
-        // Get student count
         const { data: bookingsData } = await supabase
           .from("bookings")
-          .select("student_id")
+          .select(
+            `
+            student_id,
+            school_id,
+            schools!inner(name)
+          `
+          )
           .eq("driver_id", driver.driver_id)
           .eq("status", "confirmed")
           .eq("booking_type", "monthly");
@@ -58,55 +87,24 @@ function MyFleetContent() {
         stats[driver.driver_id] = {
           students: bookingsData?.length || 0,
         };
+
+        const schoolMap = new Map<number, string>();
+        for (const booking of bookingsData || []) {
+          const school = booking.schools as unknown as { name: string };
+          schoolMap.set(booking.school_id, school?.name || "Unknown School");
+        }
+        routes[driver.driver_id] = Array.from(schoolMap.entries()).map(
+          ([school_id, school_name]) => ({ school_id, school_name })
+        );
       }
 
       setDriverStats(stats);
+      setDriverRoutes(routes);
       setLoadingStats(false);
     };
 
     fetchDriverStats();
   }, [drivers]);
-
-  const handleDownloadReport = () => {
-    if (!drivers || drivers.length === 0) {
-      toast.error("No data to export");
-      return;
-    }
-
-    // Create CSV content
-    const headers = [
-      "Driver Name",
-      "Cab Number",
-      "Vehicle Type",
-      "Capacity",
-      "Phone",
-      "Status",
-      "Rating",
-      "Active Students",
-    ];
-
-    const rows = drivers.map((driver) => {
-      const stats = driverStats[driver.driver_id] || { students: 0 };
-      return [
-        driver.name || "",
-        driver.cab_number,
-        driver.vehicle_type,
-        driver.cab_capacity,
-        driver.phone || "",
-        driver.is_verified ? "Active" : "Pending",
-        driver.avg_rating?.toFixed(1) || "N/A",
-        stats.students,
-      ];
-    });
-
-    downloadCSV(
-      headers,
-      rows,
-      `fleet-report-${new Date().toISOString().split("T")[0]}`
-    );
-
-    toast.success("Fleet report downloaded successfully");
-  };
 
   const filteredDrivers = drivers?.filter((driver) => {
     if (!searchTerm) return true;
@@ -136,13 +134,53 @@ function MyFleetContent() {
             My Fleet
           </h1>
           <p className="text-muted-foreground">
-            View and manage your assigned drivers
+            View drivers, switch student assignments, and manage trip routes
           </p>
         </div>
-        <Button onClick={handleDownloadReport}>
-          <Download className="mr-2 h-4 w-4" />
-          Download Report
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/sub-admin/students")}
+          >
+            <UserCog className="mr-2 h-4 w-4" />
+            Switch Drivers
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/sub-admin/route-ordering")}
+          >
+            <Route className="mr-2 h-4 w-4" />
+            Trip Order
+          </Button>
+          <ExportButton
+            headers={[
+              "Driver Name",
+              "Cab Number",
+              "Vehicle Type",
+              "Capacity",
+              "Phone",
+              "Status",
+              "Rating",
+              "Active Students",
+            ]}
+            rows={(drivers || []).map((driver) => {
+              const stats = driverStats[driver.driver_id] || { students: 0 };
+              return [
+                driver.name || "",
+                driver.cab_number,
+                driver.vehicle_type,
+                driver.cab_capacity,
+                driver.phone || "",
+                driver.is_verified ? "Active" : "Pending",
+                driver.avg_rating?.toFixed(1) || "N/A",
+                stats.students,
+              ];
+            })}
+            filename={`fleet-report-${new Date().toISOString().split("T")[0]}`}
+            disabled={!drivers?.length}
+            label="Export"
+          />
+        </div>
       </div>
 
       <Card>
@@ -171,6 +209,7 @@ function MyFleetContent() {
                     <TableHead>Rating</TableHead>
                     <TableHead>Active Students</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -178,6 +217,7 @@ function MyFleetContent() {
                     const stats = driverStats[driver.driver_id] || {
                       students: 0,
                     };
+                    const routes = driverRoutes[driver.driver_id] || [];
 
                     return (
                       <TableRow key={driver.driver_id}>
@@ -206,7 +246,9 @@ function MyFleetContent() {
                           {loadingStats ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Badge variant="secondary">{stats.students} students</Badge>
+                            <Badge variant="secondary">
+                              {stats.students} students
+                            </Badge>
                           )}
                         </TableCell>
                         <TableCell>
@@ -215,6 +257,70 @@ function MyFleetContent() {
                           ) : (
                             <Badge variant="secondary">Pending</Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                navigate(
+                                  `/sub-admin/students?driverId=${driver.driver_id}`
+                                )
+                              }
+                            >
+                              <UserCog className="mr-1 h-3 w-3" />
+                              Switch
+                            </Button>
+                            {routes.length === 1 ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  navigate(
+                                    `/sub-admin/route-ordering/${driver.driver_id}/${routes[0].school_id}`
+                                  )
+                                }
+                              >
+                                <Route className="mr-1 h-3 w-3" />
+                                Trip Order
+                              </Button>
+                            ) : routes.length > 1 ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="outline">
+                                    <Route className="mr-1 h-3 w-3" />
+                                    Trip Order
+                                    <ChevronDown className="ml-1 h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {routes.map((route) => (
+                                    <DropdownMenuItem
+                                      key={route.school_id}
+                                      onClick={() =>
+                                        navigate(
+                                          `/sub-admin/route-ordering/${driver.driver_id}/${route.school_id}`
+                                        )
+                                      }
+                                    >
+                                      {route.school_name}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled
+                                title="No active student routes"
+                              >
+                                <Route className="mr-1 h-3 w-3" />
+                                Trip Order
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

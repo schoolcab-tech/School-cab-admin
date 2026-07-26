@@ -74,6 +74,8 @@ interface StudentsTableProps {
     cab_number: string;
     vehicle_type?: string;
   }>;
+  /** Pre-select driver filter dropdown */
+  initialDriverFilter?: string;
   /** Only allow switching drivers between fleet — hide edit/delete/status. */
   driverSwitchOnly?: boolean;
   /** Hide write actions (assign, edit, status toggle). */
@@ -87,6 +89,7 @@ export function StudentsTable({
   schoolId,
   driverIds,
   fleetDrivers,
+  initialDriverFilter,
   driverSwitchOnly = false,
   readOnly = false,
   detailBasePath = "/students",
@@ -103,7 +106,9 @@ export function StudentsTable({
   const [searchTerm, setSearchTerm] = useState("");
   const [schoolFilter, setSchoolFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [driverFilter, setDriverFilter] = useState("all");
+  const [driverFilter, setDriverFilter] = useState(
+    initialDriverFilter || "all"
+  );
   const [pincodeFilter, setPincodeFilter] = useState("all");
 
   // ── Selection state ──

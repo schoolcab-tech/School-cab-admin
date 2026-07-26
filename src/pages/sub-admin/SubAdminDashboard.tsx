@@ -1,13 +1,15 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RouteOrderingContent } from "@/pages/route-ordering/RouteOrderingPage";
 import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useOwnerDrivers } from "@/hooks/useFleetMappings";
-import { Car, Users, TrendingUp, DollarSign, Loader2, Download } from "lucide-react";
+import { Car, Users, TrendingUp, DollarSign, Loader2, Download, UserCog, Route } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadCSV } from "@/lib/csvExport";
+import { useNavigate } from "react-router-dom";
 
 export default function SubAdminDashboard() {
   return (
@@ -18,6 +20,7 @@ export default function SubAdminDashboard() {
 }
 
 function SubAdminDashboardContent() {
+  const navigate = useNavigate();
   const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
   const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
     fleetOwner?.owner_id
@@ -87,6 +90,16 @@ function SubAdminDashboardContent() {
     fetchStats();
   }, [drivers]);
 
+  useEffect(() => {
+    if (window.location.hash === "#route-ordering-section") {
+      requestAnimationFrame(() => {
+        document.getElementById("route-ordering-section")?.scrollIntoView({
+          behavior: "smooth",
+        });
+      });
+    }
+  }, [loadingStats, drivers]);
+
   if (loadingOwner || loadingDrivers || loadingStats) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -136,6 +149,87 @@ function SubAdminDashboardContent() {
           Export
         </Button>
       </div>
+
+      {/* Quick Actions */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => navigate("/sub-admin/students")}
+        >
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCog className="h-5 w-5" />
+              Switch Drivers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Reassign students between drivers in your fleet
+            </p>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => {
+            document.getElementById("route-ordering-section")?.scrollIntoView({
+              behavior: "smooth",
+            });
+          }}
+        >
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Route className="h-5 w-5" />
+              Route Ordering
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Set pickup and drop-off order for students on each driver route
+            </p>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => navigate("/sub-admin/my-fleet")}
+        >
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Car className="h-5 w-5" />
+              My Fleet
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Manage drivers, switch students, and edit routes per cab
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Route Ordering — embedded on dashboard (prominent placement) */}
+      {drivers && drivers.length > 0 ? (
+        <div id="route-ordering-section">
+          <RouteOrderingContent
+            driverIds={drivers.map((d) => d.driver_id)}
+            fleetDrivers={drivers}
+            basePath="/sub-admin/route-ordering"
+            embedded
+          />
+        </div>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Route className="h-5 w-5" />
+              Route Ordering
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-muted-foreground text-center py-8">
+            No drivers assigned to your fleet yet. Request drivers from the admin
+            to configure route ordering.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

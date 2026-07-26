@@ -62,6 +62,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ExportButton } from "@/components/ExportButton";
 
 export interface TripSchedulesContentProps {
   schoolId?: number;
@@ -74,19 +75,40 @@ export function TripSchedulesContent({
 }: TripSchedulesContentProps) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("schedules");
+  const { data: schedules = [] } = useTripSchedules(schoolId);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Clock className="h-8 w-8" />
-          Trip Schedules & Alerts
-        </h1>
-        <p className="text-muted-foreground">
-          {readOnly
-            ? "View expected trip start times and driver compliance for your school."
-            : "Configure expected trip start times and monitor driver compliance."}
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Clock className="h-8 w-8" />
+            Trip Schedules & Alerts
+          </h1>
+          <p className="text-muted-foreground">
+            {readOnly
+              ? "View expected trip start times and driver compliance for your school."
+              : "Configure expected trip start times and monitor driver compliance."}
+          </p>
+        </div>
+        <ExportButton
+          headers={[
+            "Driver",
+            "School",
+            "Morning Start",
+            "Evening Start",
+            "Active",
+          ]}
+          rows={schedules.map((s) => [
+            s.driver_name,
+            s.school_name,
+            s.morning_start_time || "",
+            s.evening_start_time || "",
+            s.is_active ? "Yes" : "No",
+          ])}
+          filename={`trip-schedules-${new Date().toISOString().split("T")[0]}`}
+          disabled={schedules.length === 0}
+        />
       </div>
 
       <StatsCards schoolId={schoolId} />

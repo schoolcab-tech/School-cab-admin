@@ -16,6 +16,7 @@ import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useDriverSchoolRoutes } from "@/hooks/useRouteOrdering";
 import { downloadCSV } from "@/lib/csvExport";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowRight,
   Bus,
@@ -28,43 +29,103 @@ import {
   Search,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+type FleetDriverRef = {
+  driver_id: number;
+  name?: string | null;
+  schools_serving?: number[] | null;
+};
 
 export interface RouteOrderingContentProps {
   schoolId?: number;
   driverIds?: number[];
+  /** Fleet drivers used to build fallback routes when bookings query returns empty */
+  fleetDrivers?: FleetDriverRef[];
   readOnly?: boolean;
   basePath?: string;
+  /** When true, renders as a dashboard section (no page-level h1). */
+  embedded?: boolean;
 }
 
 export function RouteOrderingContent({
   schoolId,
   driverIds,
+  fleetDrivers,
   readOnly = false,
   basePath = "/route-ordering",
+  embedded = false,
 }: RouteOrderingContentProps) {
   const { data: routes = [], isLoading, error } = useDriverSchoolRoutes(
     schoolId,
     driverIds
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const [schoolNames, setSchoolNames] = useState<Record<number, string>>({});
   const navigate = useNavigate();
 
-  const filteredRoutes = routes.filter(
+  // Load school names for fleet driver fallback routes
+  useEffect(() => {
+    if (!fleetDrivers?.length) return;
+    const ids = [
+      ...new Set(
+        fleetDrivers.flatMap((d) => d.schools_serving || []).filter(Boolean)
+      ),
+    ] as number[];
+    if (ids.length === 0) return;
+
+    let cancelled = false;
+    supabase
+      .from("schools")
+      .select("school_id, name")
+      .in("school_id", ids)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const map: Record<number, string> = {};
+        for (const s of data || []) map[s.school_id] = s.name;
+        setSchoolNames(map);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fleetDrivers]);
+
+  const displayRoutes = useMemo(() => {
+    if (routes.length > 0) return routes;
+    if (!fleetDrivers?.length) return [];
+
+    const fallback: typeof routes = [];
+    for (const driver of fleetDrivers) {
+      for (const schoolId of driver.schools_serving || []) {
+        if (typeof schoolId !== "number") continue;
+        fallback.push({
+          driver_id: driver.driver_id,
+          driver_name: driver.name || "Unknown Driver",
+          school_id: schoolId,
+          school_name: schoolNames[schoolId] || `School #${schoolId}`,
+          student_count: 0,
+          has_custom_order: false,
+        });
+      }
+    }
+    return fallback;
+  }, [routes, fleetDrivers, schoolNames]);
+
+  const filteredRoutes = displayRoutes.filter(
     (route) =>
       route.driver_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       route.school_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const routesWithCustomOrder = routes.filter((r) => r.has_custom_order).length;
-  const totalStudents = routes.reduce((sum, r) => sum + r.student_count, 0);
+  const routesWithCustomOrder = displayRoutes.filter((r) => r.has_custom_order).length;
+  const totalStudents = displayRoutes.reduce((sum, r) => sum + r.student_count, 0);
 
   const handleExport = () => {
-    if (routes.length === 0) return;
+    if (displayRoutes.length === 0) return;
     downloadCSV(
       ["Driver", "School", "Students", "Order Status"],
-      routes.map((route) => [
+      displayRoutes.map((route) => [
         route.driver_name,
         route.school_name,
         route.student_count,
@@ -78,14 +139,30 @@ export function RouteOrderingContent({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Route Ordering</h1>
-          <p className="text-muted-foreground">
-            {readOnly
-              ? "View pickup and drop-off order for drivers serving your school."
-              : "Configure pickup and drop-off order for students per driver per school."}
-          </p>
+          {embedded ? (
+            <>
+              <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                <Route className="h-6 w-6" />
+                Route Ordering
+              </h2>
+              <p className="text-muted-foreground">
+                Set pickup and drop-off order for students on each driver route.
+                Click <strong>Configure Order</strong> to drag-and-drop stops, or{" "}
+                <strong>Manage Trips</strong> to split students across trips.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-bold tracking-tight">Route Ordering</h1>
+              <p className="text-muted-foreground">
+                {readOnly
+                  ? "View pickup and drop-off order for drivers serving your school."
+                  : "Configure pickup and drop-off order for students per driver per school."}
+              </p>
+            </>
+          )}
         </div>
-        <Button variant="outline" onClick={handleExport} disabled={routes.length === 0}>
+        <Button variant="outline" onClick={handleExport} disabled={displayRoutes.length === 0}>
           <Download className="mr-2 h-4 w-4" />
           Export
         </Button>
@@ -100,7 +177,7 @@ export function RouteOrderingContent({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? "..." : routes.length}</div>
+            <div className="text-2xl font-bold">{isLoading ? "..." : displayRoutes.length}</div>
             <p className="text-xs text-muted-foreground">Driver-school combinations</p>
           </CardContent>
         </Card>
@@ -142,7 +219,7 @@ export function RouteOrderingContent({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? "..." : routes.length - routesWithCustomOrder}
+              {isLoading ? "..." : displayRoutes.length - routesWithCustomOrder}
             </div>
             <p className="text-xs text-muted-foreground">Routes using default order</p>
           </CardContent>
@@ -262,10 +339,18 @@ export function RouteOrderingContent({
           )}
 
           {!isLoading && filteredRoutes.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              {searchTerm
-                ? "No routes found matching your search"
-                : "No active routes found. Routes are created when students have confirmed monthly bookings with drivers."}
+            <div className="text-center py-8 text-muted-foreground space-y-2">
+              {searchTerm ? (
+                <p>No routes found matching your search</p>
+              ) : (
+                <>
+                  <p>No routes found for your fleet drivers yet.</p>
+                  <p className="text-sm">
+                    Routes appear when drivers are assigned to schools. Contact the
+                    admin if your drivers should have school assignments.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </CardContent>
@@ -289,7 +374,6 @@ export function SchoolAdminRouteOrderingPage() {
       {linkedSchoolId ? (
         <RouteOrderingContent
           schoolId={linkedSchoolId}
-          readOnly
           basePath="/school-admin/route-ordering"
         />
       ) : (
@@ -324,6 +408,7 @@ export function SubAdminRouteOrderingPage() {
       {driverIds.length > 0 ? (
         <RouteOrderingContent
           driverIds={driverIds}
+          fleetDrivers={drivers}
           basePath="/sub-admin/route-ordering"
         />
       ) : (

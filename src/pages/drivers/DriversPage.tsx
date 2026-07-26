@@ -1,9 +1,11 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DriversTable } from "@/components/tables/DriversTable";
+import { ExportButton } from "@/components/ExportButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDrivers } from "@/hooks/useDrivers";
 import { supabase } from "@/integrations/supabase/client";
 import { Filter, Plus, Search, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -88,6 +90,11 @@ function DriversContent() {
     });
   };
 
+  const { data: exportDrivers = [] } = useDrivers({
+    ...filters,
+    search: searchTerm || undefined,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -97,7 +104,31 @@ function DriversContent() {
             Manage your drivers and their details
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <ExportButton
+            headers={[
+              "Driver ID",
+              "Name",
+              "Phone",
+              "Cab Number",
+              "Vehicle Type",
+              "Capacity",
+              "Status",
+              "Rating",
+            ]}
+            rows={exportDrivers.map((d) => [
+              d.driver_id,
+              d.name,
+              d.phone || "",
+              d.cab_number,
+              d.vehicle_type,
+              d.cab_capacity,
+              d.is_verified ? "Verified" : "Unverified",
+              d.avg_rating?.toFixed(1) || "",
+            ])}
+            filename={`drivers-${new Date().toISOString().split("T")[0]}`}
+            disabled={exportDrivers.length === 0}
+          />
           <Button variant="outline" onClick={() => navigate("/drivers/bulk-upload")} className="w-full md:w-auto">
             <Upload className="mr-2 h-4 w-4" />
             Bulk Upload

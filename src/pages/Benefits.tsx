@@ -3,6 +3,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, RefreshCw, Filter } from "lucide-react";
+import { ExportButton } from "@/components/ExportButton";
 import {
   Select,
   SelectContent,
@@ -138,6 +139,18 @@ export default function Benefits() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <ExportButton
+              headers={["Title", "Description", "User Type", "Status", "Created"]}
+              rows={filteredBenefits.map((b) => [
+                b.title,
+                b.description,
+                b.user_type,
+                b.is_active ? "Active" : "Inactive",
+                b.created_at ? new Date(b.created_at).toLocaleDateString() : "",
+              ])}
+              filename={`benefits-${new Date().toISOString().split("T")[0]}`}
+              disabled={filteredBenefits.length === 0}
+            />
             <Button
               variant="outline"
               size="icon"

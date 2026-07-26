@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/contexts/auth-context";
 import { useSchoolPayments } from "@/hooks/useSchoolPayments";
+import { ExportButton } from "@/components/ExportButton";
 import { format } from "date-fns";
 import { DollarSign, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -86,14 +87,38 @@ export function SchoolAdminPaymentsContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <DollarSign className="h-8 w-8" />
-          Payments & Fees
-        </h1>
-        <p className="text-muted-foreground">
-          View subscription payment status for students at your school.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <DollarSign className="h-8 w-8" />
+            Payments & Fees
+          </h1>
+          <p className="text-muted-foreground">
+            View subscription payment status for students at your school.
+          </p>
+        </div>
+        <ExportButton
+          headers={[
+            "Student",
+            "Driver",
+            "Amount",
+            "Method",
+            "Status",
+            "Date",
+          ]}
+          rows={payments.map((p) => [
+            p.student_name,
+            p.driver_name,
+            p.amount,
+            p.payment_method,
+            p.transaction_status,
+            p.transaction_date
+              ? format(new Date(p.transaction_date), "MMM dd, yyyy")
+              : "",
+          ])}
+          filename={`school-payments-${new Date().toISOString().split("T")[0]}`}
+          disabled={payments.length === 0}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

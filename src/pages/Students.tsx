@@ -11,7 +11,7 @@ import { downloadCSV } from "@/lib/csvExport";
 import { Student } from "@/types/student";
 import { Download, Loader2, Plus, RefreshCw, Upload } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 function exportStudentsToCSV(students: Student[]) {
   downloadCSV(
@@ -69,6 +69,8 @@ export interface StudentsContentProps {
     cab_number: string;
     vehicle_type?: string;
   }>;
+  /** Pre-select driver filter (e.g. from My Fleet link) */
+  initialDriverFilter?: string;
   driverSwitchOnly?: boolean;
   readOnly?: boolean;
   detailBasePath?: string;
@@ -80,6 +82,7 @@ export function StudentsContent({
   schoolId,
   driverIds,
   fleetDrivers,
+  initialDriverFilter,
   driverSwitchOnly = false,
   readOnly = false,
   detailBasePath = "/students",
@@ -201,6 +204,7 @@ export function StudentsContent({
             schoolId={schoolId}
             driverIds={driverIds}
             fleetDrivers={fleetDrivers}
+            initialDriverFilter={initialDriverFilter}
             driverSwitchOnly={driverSwitchOnly}
             readOnly={readOnly}
             detailBasePath={detailBasePath}
@@ -212,6 +216,7 @@ export function StudentsContent({
             schoolId={schoolId}
             driverIds={driverIds}
             fleetDrivers={fleetDrivers}
+            initialDriverFilter={initialDriverFilter}
             driverSwitchOnly={driverSwitchOnly}
             readOnly={readOnly}
             detailBasePath={detailBasePath}
@@ -223,6 +228,7 @@ export function StudentsContent({
             schoolId={schoolId}
             driverIds={driverIds}
             fleetDrivers={fleetDrivers}
+            initialDriverFilter={initialDriverFilter}
             driverSwitchOnly={driverSwitchOnly}
             readOnly={readOnly}
             detailBasePath={detailBasePath}
@@ -261,6 +267,8 @@ export function SchoolAdminStudentsPage() {
 }
 
 export function SubAdminStudentsPage() {
+  const [searchParams] = useSearchParams();
+  const initialDriverFilter = searchParams.get("driverId") || undefined;
   const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
   const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
     fleetOwner?.owner_id
@@ -284,6 +292,7 @@ export function SubAdminStudentsPage() {
         <StudentsContent
           driverIds={driverIds}
           fleetDrivers={drivers}
+          initialDriverFilter={initialDriverFilter}
           driverSwitchOnly
         />
       ) : (

@@ -63,6 +63,7 @@ import RouteOrderingDetailPage, {
 } from "./pages/route-ordering/RouteOrderingDetailPage";
 import DriverTripManagement, {
   SubAdminDriverTripManagement,
+  SchoolAdminDriverTripManagement,
 } from "./pages/route-ordering/DriverTripManagement";
 
 // Trip Schedules Page
@@ -103,7 +104,7 @@ import SchoolAdminPaymentsPage from "./pages/school-admin/SchoolAdminPaymentsPag
 import SchoolAdminProfilePage from "./pages/school-admin/SchoolAdminProfilePage";
 
 // Vehicles / Reports / Performance
-import VehiclesPage, { SchoolAdminVehiclesPage } from "./pages/vehicles/VehiclesPage";
+import VehiclesPage, { SchoolAdminVehiclesPage, SubAdminVehiclesPage } from "./pages/vehicles/VehiclesPage";
 import ReportsPage, { SchoolAdminReportsPage } from "./pages/reports/ReportsPage";
 import PerformancePage, { SchoolAdminPerformancePage } from "./pages/performance/PerformancePage";
 
@@ -620,6 +621,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/school-admin/route-ordering/:driverId/:schoolId/trips"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <SchoolAdminDriverTripManagement />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/school-admin/trip-schedules"
         element={
           <RoleBasedRoute allowedRoles={["school_admin"]}>
@@ -674,6 +683,14 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["sub_admin"]}>
             <MyFleetPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/sub-admin/vehicles"
+        element={
+          <RoleBasedRoute allowedRoles={["sub_admin"]}>
+            <SubAdminVehiclesPage />
           </RoleBasedRoute>
         }
       />

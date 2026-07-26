@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/contexts/auth-context";
 import { useBookingsBySchool } from "@/hooks/useBookings";
+import { ExportButton } from "@/components/ExportButton";
 import { format } from "date-fns";
 import { Car, Eye, Loader2, Search, User } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -57,11 +58,25 @@ export function SchoolAdminBookingsContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
-        <p className="text-muted-foreground">
-          View transport bookings for students at your school.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
+          <p className="text-muted-foreground">
+            View transport bookings for students at your school.
+          </p>
+        </div>
+        <ExportButton
+          headers={["Student", "Driver", "Status", "Booking Type", "Created"]}
+          rows={filtered.map((b) => [
+            b.student_name,
+            b.driver_name,
+            b.status,
+            b.booking_type,
+            b.created_at ? format(new Date(b.created_at), "MMM dd, yyyy") : "",
+          ])}
+          filename={`school-bookings-${new Date().toISOString().split("T")[0]}`}
+          disabled={filtered.length === 0}
+        />
       </div>
 
       <Card>

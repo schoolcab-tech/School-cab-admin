@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { ExportButton } from "@/components/ExportButton";
 
 export default function WebsiteLeadsPage() {
   const {
@@ -89,11 +90,46 @@ export default function WebsiteLeadsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Website Leads</h1>
-          <p className="text-muted-foreground">
-            View and manage leads from the website contact form and booking requests.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Website Leads</h1>
+            <p className="text-muted-foreground">
+              View and manage leads from the website contact form and booking requests.
+            </p>
+          </div>
+          <ExportButton
+            headers={[
+              "Type",
+              "Name",
+              "Email",
+              "Phone",
+              "School",
+              "Message",
+              "Date",
+            ]}
+            rows={[
+              ...contactResponses.map((c: any) => [
+                "Contact",
+                c.name || "",
+                c.email || "",
+                c.phone || "",
+                "",
+                c.message || "",
+                formatDate(c.created_at),
+              ]),
+              ...leadBookings.map((l: any) => [
+                "Booking",
+                l.parent_name || l.name || "",
+                l.email || "",
+                l.phone || "",
+                l.school_name || "",
+                l.notes || "",
+                formatDate(l.created_at),
+              ]),
+            ]}
+            filename={`website-leads-${new Date().toISOString().split("T")[0]}`}
+            disabled={contactResponses.length === 0 && leadBookings.length === 0}
+          />
         </div>
 
         {/* Stats Overview */}

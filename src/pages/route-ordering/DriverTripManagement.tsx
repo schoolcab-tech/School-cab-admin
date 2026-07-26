@@ -63,11 +63,13 @@ import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 export interface DriverTripManagementContentProps {
   listBasePath?: string;
   allowedDriverIds?: number[];
+  linkedSchoolId?: number;
 }
 
 export function DriverTripManagementContent({
   listBasePath = "/route-ordering",
   allowedDriverIds,
+  linkedSchoolId,
 }: DriverTripManagementContentProps) {
   const { driverId: driverIdParam, schoolId: schoolIdParam } = useParams();
   const driverId = Number(driverIdParam);
@@ -76,7 +78,16 @@ export function DriverTripManagementContent({
   const { user } = useAuth();
 
   if (
+    linkedSchoolId != null &&
+    schoolId > 0 &&
+    schoolId !== linkedSchoolId
+  ) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (
     allowedDriverIds != null &&
+    allowedDriverIds.length > 0 &&
     driverId > 0 &&
     !allowedDriverIds.includes(driverId)
   ) {
@@ -528,6 +539,24 @@ export function SubAdminDriverTripManagement() {
         listBasePath="/sub-admin/route-ordering"
         allowedDriverIds={allowedDriverIds}
       />
+    </DashboardLayout>
+  );
+}
+
+export function SchoolAdminDriverTripManagement() {
+  const { linkedSchoolId } = useAuth();
+  return (
+    <DashboardLayout>
+      {linkedSchoolId ? (
+        <DriverTripManagementContent
+          listBasePath="/school-admin/route-ordering"
+          linkedSchoolId={linkedSchoolId}
+        />
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          No school linked to your account.
+        </div>
+      )}
     </DashboardLayout>
   );
 }

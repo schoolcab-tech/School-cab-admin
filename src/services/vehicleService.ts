@@ -30,7 +30,14 @@ const INACTIVITY_THRESHOLD_MIN = 5;
  * with the latest live status from driver_locations LEFT-joined.
  * Optionally filter to vehicles serving a specific school.
  */
-export async function getAllVehicles(opts?: { schoolId?: number }): Promise<Vehicle[]> {
+export async function getAllVehicles(opts?: {
+  schoolId?: number;
+  driverIds?: number[];
+}): Promise<Vehicle[]> {
+  if (opts?.driverIds != null && opts.driverIds.length === 0) {
+    return [];
+  }
+
   // Step 1: load drivers (filtered by school if requested)
   let driversQuery = db
     .from("drivers")
@@ -38,6 +45,10 @@ export async function getAllVehicles(opts?: { schoolId?: number }): Promise<Vehi
       "driver_id, name, phone, cab_number, vehicle_type, cab_capacity, license_number, is_verified, schools_serving"
     )
     .order("name", { ascending: true });
+
+  if (opts?.driverIds != null) {
+    driversQuery = driversQuery.in("driver_id", opts.driverIds);
+  }
 
   const { data: drivers, error: driversError } = await driversQuery;
   if (driversError) throw driversError;

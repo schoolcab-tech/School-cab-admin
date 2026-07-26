@@ -37,6 +37,98 @@ export interface DriverSchoolRouteSummary {
   has_custom_order: boolean;
 }
 
+function upsertRouteSummary(
+  routeMap: Map<string, DriverSchoolRouteSummary>,
+  driverId: number,
+  schoolId: number,
+  driverName: string,
+  schoolName: string,
+  addStudents = 0
+) {
+  const key = `${driverId}-${schoolId}`;
+  if (!routeMap.has(key)) {
+    routeMap.set(key, {
+      driver_id: driverId,
+      driver_name: driverName,
+      school_id: schoolId,
+      school_name: schoolName,
+      student_count: 0,
+      has_custom_order: false,
+    });
+  }
+  if (addStudents > 0) {
+    routeMap.get(key)!.student_count += addStudents;
+  }
+}
+
+async function mergeFleetDriverRoutes(
+  routeMap: Map<string, DriverSchoolRouteSummary>,
+  driverIds: number[]
+) {
+  if (driverIds.length === 0) return;
+
+  const { data: drivers } = await supabase
+    .from("drivers")
+    .select("driver_id, name, schools_serving")
+    .in("driver_id", driverIds);
+
+  const schoolIds = new Set<number>();
+  for (const driver of drivers || []) {
+    for (const schoolId of driver.schools_serving || []) {
+      if (typeof schoolId === "number") schoolIds.add(schoolId);
+    }
+  }
+
+  const schoolNames = new Map<number, string>();
+  if (schoolIds.size > 0) {
+    const { data: schools } = await supabase
+      .from("schools")
+      .select("school_id, name")
+      .in("school_id", Array.from(schoolIds));
+    for (const school of schools || []) {
+      schoolNames.set(school.school_id, school.name);
+    }
+  }
+
+  for (const driver of drivers || []) {
+    for (const schoolId of driver.schools_serving || []) {
+      if (typeof schoolId !== "number") continue;
+      upsertRouteSummary(
+        routeMap,
+        driver.driver_id,
+        schoolId,
+        driver.name || "Unknown Driver",
+        schoolNames.get(schoolId) || `School #${schoolId}`
+      );
+    }
+  }
+
+  const { data: trips } = await supabase
+    .from("driver_trips")
+    .select(
+      `
+      driver_id,
+      school_id,
+      drivers!inner ( name ),
+      schools!inner ( name )
+    `
+    )
+    .in("driver_id", driverIds)
+    .eq("is_active", true);
+
+  for (const trip of trips || []) {
+    const driver = trip.drivers as unknown as { name: string };
+    const school = trip.schools as unknown as { name: string };
+    upsertRouteSummary(
+      routeMap,
+      trip.driver_id,
+      trip.school_id,
+      driver?.name || "Unknown Driver",
+      school?.name || "Unknown School"
+    );
+  }
+}
+
 /**
  * Get all driver-school combinations for the admin list view
  */
@@ -77,26 +169,28 @@ export async function getAllDriverSchoolRoutes(options?: {
 
   const { data, error } = await query;
 
-  if (error) throw error;
+  // Fleet owners may not have bookings RLS access — fall back to schools_serving
+  if (error && options?.driverIds == null) {
+    throw error;
+  }
 
-  // Group by driver-school
   const routeMap = new Map<string, DriverSchoolRouteSummary>();
 
   for (const booking of data || []) {
-    const key = `${booking.driver_id}-${booking.school_id}`;
-    if (!routeMap.has(key)) {
-      const driver = booking.drivers as unknown as { driver_id: number; name: string };
-      const school = booking.schools as unknown as { school_id: number; name: string };
-      routeMap.set(key, {
-        driver_id: booking.driver_id,
-        driver_name: driver.name || "Unknown Driver",
-        school_id: booking.school_id,
-        school_name: school.name || "Unknown School",
-        student_count: 0,
-        has_custom_order: false,
-      });
-    }
-    routeMap.get(key)!.student_count++;
+    const driver = booking.drivers as unknown as { driver_id: number; name: string };
+    const school = booking.schools as unknown as { school_id: number; name: string };
+    upsertRouteSummary(
+      routeMap,
+      booking.driver_id,
+      booking.school_id,
+      driver.name || "Unknown Driver",
+      school.name || "Unknown School",
+      1
+    );
+  }
+
+  if (options?.driverIds != null) {
+    await mergeFleetDriverRoutes(routeMap, options.driverIds);
   }
 
   const routes = Array.from(routeMap.values());

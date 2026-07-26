@@ -19,8 +19,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/contexts/auth-context";
+import { useMyFleetOwner } from "@/hooks/useFleetOwners";
+import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useSimpleQuery } from "@/hooks/useSimpleQuery";
 import { getAllVehicles, type Vehicle } from "@/services/vehicleService";
+import { ExportButton } from "@/components/ExportButton";
 import {
   Car,
   Eye,
@@ -35,6 +38,14 @@ import { useNavigate } from "react-router-dom";
 interface VehiclesPageProps {
   /** If set, only show vehicles for drivers serving this school. */
   schoolId?: number;
+  /** If set, only show vehicles for these driver IDs. */
+  driverIds?: number[];
+  /** Page title override */
+  title?: string;
+  /** Page description override */
+  description?: string;
+  /** Filename prefix for CSV export */
+  exportPrefix?: string;
 }
 
 export default function VehiclesPage(_props: VehiclesPageProps) {
@@ -56,10 +67,57 @@ export function SchoolAdminVehiclesPage() {
 
 function SchoolAdminVehiclesContent() {
   const { linkedSchoolId } = useAuth();
-  return <VehiclesContent schoolId={linkedSchoolId ?? undefined} />;
+  return (
+    <VehiclesContent
+      schoolId={linkedSchoolId ?? undefined}
+      exportPrefix="school-vehicles"
+    />
+  );
 }
 
-function VehiclesContent({ schoolId }: VehiclesPageProps = {}) {
+export function SubAdminVehiclesPage() {
+  const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
+  const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
+    fleetOwner?.owner_id
+  );
+
+  if (loadingOwner || loadingDrivers) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const driverIds = drivers?.map((d) => d.driver_id) ?? [];
+
+  return (
+    <DashboardLayout>
+      {driverIds.length > 0 ? (
+        <VehiclesContent
+          driverIds={driverIds}
+          title="My Vehicles"
+          description="Vehicles in your fleet. Status auto-refreshes every 30 seconds."
+          exportPrefix="fleet-vehicles"
+        />
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          No drivers assigned to your fleet yet.
+        </div>
+      )}
+    </DashboardLayout>
+  );
+}
+
+function VehiclesContent({
+  schoolId,
+  driverIds,
+  title = "Vehicles",
+  description,
+  exportPrefix = "vehicles",
+}: VehiclesPageProps = {}) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -72,8 +130,12 @@ function VehiclesContent({ schoolId }: VehiclesPageProps = {}) {
     isLoading,
     error,
   } = useSimpleQuery<Vehicle[]>(
-    () => getAllVehicles(schoolId != null ? { schoolId } : undefined),
-    [schoolId],
+    () =>
+      getAllVehicles({
+        ...(schoolId != null ? { schoolId } : {}),
+        ...(driverIds != null ? { driverIds } : {}),
+      }),
+    [schoolId, driverIds?.join(",")],
     { refetchInterval: 30000 }
   );
 
@@ -112,16 +174,43 @@ function VehiclesContent({ schoolId }: VehiclesPageProps = {}) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Truck className="h-7 w-7" />
-          Vehicles
-        </h1>
-        <p className="text-muted-foreground">
-          {schoolId != null
-            ? "All vehicles serving your school. Status auto-refreshes every 30 seconds."
-            : "All registered vehicles in the fleet. Status auto-refreshes every 30 seconds."}
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Truck className="h-7 w-7" />
+            {title}
+          </h1>
+          <p className="text-muted-foreground">
+            {description ??
+              (schoolId != null
+                ? "All vehicles serving your school. Status auto-refreshes every 30 seconds."
+                : "All registered vehicles in the fleet. Status auto-refreshes every 30 seconds.")}
+          </p>
+        </div>
+        <ExportButton
+          headers={[
+            "Cab Number",
+            "Type",
+            "Capacity",
+            "Driver",
+            "Phone",
+            "Status",
+            "Last Seen",
+          ]}
+          rows={filtered.map((v) => [
+            v.cab_number,
+            v.vehicle_type,
+            v.cab_capacity,
+            v.driver_name,
+            v.phone || "",
+            v.is_live ? "Active" : "Inactive",
+            v.last_seen_at
+              ? new Date(v.last_seen_at).toLocaleString()
+              : "Never",
+          ])}
+          filename={`${exportPrefix}-${new Date().toISOString().split("T")[0]}`}
+          disabled={filtered.length === 0}
+        />
       </div>
 
       <div className="grid gap-3 grid-cols-3">

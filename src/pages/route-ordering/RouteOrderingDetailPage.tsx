@@ -73,6 +73,7 @@ export function RouteOrderingDetailContent({
 
   if (
     allowedDriverIds != null &&
+    allowedDriverIds.length > 0 &&
     driverIdNum > 0 &&
     !allowedDriverIds.includes(driverIdNum)
   ) {
@@ -526,7 +527,6 @@ export function SchoolAdminRouteOrderingDetailPage() {
   return (
     <DashboardLayout>
       <RouteOrderingDetailContent
-        readOnly
         listPath="/school-admin/route-ordering"
         linkedSchoolId={linkedSchoolId ?? undefined}
       />
@@ -555,7 +555,7 @@ export function SubAdminRouteOrderingDetailPage() {
   return (
     <DashboardLayout>
       <RouteOrderingDetailContent
-        listPath="/sub-admin/route-ordering"
+        listPath="/sub-admin/dashboard#route-ordering-section"
         allowedDriverIds={allowedDriverIds}
       />
     </DashboardLayout>

@@ -223,9 +223,15 @@ const navigationItems: NavItem[] = [
     roles: ['sub_admin'],
   },
   {
+    title: "My Vehicles",
+    url: "/sub-admin/vehicles",
+    icon: Car,
+    roles: ['sub_admin'],
+  },
+  {
     title: "Switch Drivers",
     url: "/sub-admin/students",
-    icon: Users,
+    icon: UserCog,
     roles: ['sub_admin'],
   },
   {
