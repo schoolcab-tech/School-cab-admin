@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { CreateSchoolInput, School, UpdateSchoolInput } from "@/types/school";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -98,6 +99,8 @@ const formSchema = z.object({
   additionalInfo: z.string().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
+  livestreamEnabled: z.boolean().default(false),
+  livestreamQuality: z.enum(["720p", "480p", "360p"]).default("720p"),
 });
 
 // Use the OperatingHours type from the school types
@@ -142,6 +145,8 @@ export function SchoolForm({
       return {
         ...restData,
         locality: address.locality,
+        livestreamEnabled: initialData.livestreamEnabled ?? false,
+        livestreamQuality: initialData.livestreamQuality ?? "720p",
         address: {
           street: address.street,
           city: address.city,
@@ -180,6 +185,8 @@ export function SchoolForm({
         sunday: null,
       },
       additionalInfo: "",
+      livestreamEnabled: false,
+      livestreamQuality: "720p" as const,
     };
   };
 
@@ -220,6 +227,8 @@ export function SchoolForm({
             saturday: initialData.operatingHours.saturday || null,
             sunday: initialData.operatingHours.sunday || null,
           },
+          livestreamEnabled: initialData.livestreamEnabled ?? false,
+          livestreamQuality: initialData.livestreamQuality ?? "720p",
         }
       : {
           name: "",
@@ -249,6 +258,8 @@ export function SchoolForm({
             sunday: null,
           },
           additionalInfo: "",
+          livestreamEnabled: false,
+          livestreamQuality: "720p" as const,
         },
   });
 
@@ -265,6 +276,8 @@ export function SchoolForm({
         latitude: selectedCoordinates?.lat ?? null,
         longitude: selectedCoordinates?.lng ?? null,
         googlePlaceId: googlePlaceId ?? null,
+        livestreamEnabled: formData.livestreamEnabled,
+        livestreamQuality: formData.livestreamQuality,
       };
 
       await onSubmit(submissionData as CreateSchoolInput | UpdateSchoolInput);
@@ -615,6 +628,63 @@ export function SchoolForm({
           </div>
 
           {/* Additional Info */}
+          {!profileMode && (
+            <div className="space-y-4 md:col-span-2 rounded-lg border p-4 bg-muted/20">
+              <div>
+                <h3 className="text-lg font-medium">Live Cab Streaming</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Allow parents and admins to watch the driver&apos;s live camera feed during
+                  active trips for this school.
+                </p>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="livestreamEnabled"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-background">
+                    <div className="space-y-0.5">
+                      <FormLabel>Enable live streaming</FormLabel>
+                      <p className="text-xs text-muted-foreground">
+                        Drivers on trips for this school can broadcast cab video
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="livestreamQuality"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stream quality</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!form.watch("livestreamEnabled")}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select quality" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="720p">720p (HD — recommended)</SelectItem>
+                        <SelectItem value="480p">480p (Standard)</SelectItem>
+                        <SelectItem value="360p">360p (Low bandwidth)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+
           <div className="space-y-4 md:col-span-2">
             <h3 className="text-lg font-medium">Additional Information</h3>
 

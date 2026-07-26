@@ -23,6 +23,8 @@ export interface OperatingHours {
   sunday?: { open: string; close: string } | null;
 }
 
+export type LivestreamQuality = "720p" | "480p" | "360p";
+
 export interface School {
   id: string;
   name: string;
@@ -44,6 +46,8 @@ export interface School {
   latitude?: number | null;
   longitude?: number | null;
   googlePlaceId?: string | null;
+  livestreamEnabled: boolean;
+  livestreamQuality: LivestreamQuality;
 }
 
 export interface CreateSchoolInput

@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import { Car, Download, Loader2, Phone, Star, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { downloadCSV } from "@/lib/csvExport";
 
 export default function MyFleetPage() {
   return (
@@ -98,26 +99,11 @@ function MyFleetContent() {
       ];
     });
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    // Download CSV
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `fleet-report-${new Date().toISOString().split("T")[0]}.csv`
+    downloadCSV(
+      headers,
+      rows,
+      `fleet-report-${new Date().toISOString().split("T")[0]}`
     );
-    link.style.visibility = "hidden";
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
 
     toast.success("Fleet report downloaded successfully");
   };

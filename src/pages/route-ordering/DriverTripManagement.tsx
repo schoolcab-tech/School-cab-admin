@@ -54,16 +54,34 @@ import {
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import type { DriverTrip, TripStudent, UnassignedStudent } from "@/services/driverTripService";
+import { useMyFleetOwner } from "@/hooks/useFleetOwners";
+import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 
-export default function DriverTripManagement() {
+export interface DriverTripManagementContentProps {
+  listBasePath?: string;
+  allowedDriverIds?: number[];
+}
+
+export function DriverTripManagementContent({
+  listBasePath = "/route-ordering",
+  allowedDriverIds,
+}: DriverTripManagementContentProps) {
   const { driverId: driverIdParam, schoolId: schoolIdParam } = useParams();
   const driverId = Number(driverIdParam);
   const schoolId = Number(schoolIdParam);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  if (
+    allowedDriverIds != null &&
+    driverId > 0 &&
+    !allowedDriverIds.includes(driverId)
+  ) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   const {
     data: trips = [],
@@ -230,14 +248,13 @@ export default function DriverTripManagement() {
   const totalStudents = totalAssigned + unassigned.length;
 
   return (
-    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(`/route-ordering/${driverId}/${schoolId}`)}
+            onClick={() => navigate(`${listBasePath}/${driverId}/${schoolId}`)}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -476,6 +493,41 @@ export default function DriverTripManagement() {
           </DialogContent>
         </Dialog>
       </div>
+  );
+}
+
+export default function DriverTripManagement() {
+  return (
+    <DashboardLayout>
+      <DriverTripManagementContent />
+    </DashboardLayout>
+  );
+}
+
+export function SubAdminDriverTripManagement() {
+  const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
+  const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
+    fleetOwner?.owner_id
+  );
+
+  if (loadingOwner || loadingDrivers) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const allowedDriverIds = drivers?.map((d) => d.driver_id) ?? [];
+
+  return (
+    <DashboardLayout>
+      <DriverTripManagementContent
+        listBasePath="/sub-admin/route-ordering"
+        allowedDriverIds={allowedDriverIds}
+      />
     </DashboardLayout>
   );
 }

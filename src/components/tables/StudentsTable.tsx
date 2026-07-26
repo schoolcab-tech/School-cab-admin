@@ -65,6 +65,17 @@ interface StudentsTableProps {
   statusTab?: "all" | "active" | "inactive";
   /** When set, only show students for this school and hide school filter. */
   schoolId?: number;
+  /** When set, only show students assigned to these drivers. */
+  driverIds?: number[];
+  /** Limit driver reassignment dropdown to these fleet drivers. */
+  fleetDrivers?: Array<{
+    driver_id: number;
+    name?: string | null;
+    cab_number: string;
+    vehicle_type?: string;
+  }>;
+  /** Only allow switching drivers between fleet — hide edit/delete/status. */
+  driverSwitchOnly?: boolean;
   /** Hide write actions (assign, edit, status toggle). */
   readOnly?: boolean;
   /** Base path for student detail links. Default: /students */
@@ -74,6 +85,9 @@ interface StudentsTableProps {
 export function StudentsTable({
   statusTab = "all",
   schoolId,
+  driverIds,
+  fleetDrivers,
+  driverSwitchOnly = false,
   readOnly = false,
   detailBasePath = "/students",
 }: StudentsTableProps) {
@@ -104,14 +118,19 @@ export function StudentsTable({
   const [isBulkAssign, setIsBulkAssign] = useState(false);
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
+  const canWrite = !readOnly;
+  const canReassign = canWrite || driverSwitchOnly;
+  const canFullEdit = canWrite && !driverSwitchOnly;
+
   // ── Data ──
   const {
     data: students = [],
     isLoading,
     error,
     refetch,
-  } = useStudents(schoolId);
-  const { data: drivers = [] } = useDrivers();
+  } = useStudents(schoolId, driverIds);
+  const { data: allDrivers = [] } = useDrivers();
+  const drivers = fleetDrivers ?? allDrivers;
   const { mutate: updateStatus } = useUpdateStudentStatus();
   const { mutate: assignDriver } = useAssignDriver();
   const deleteStudentMutation = useDeleteStudent();
@@ -404,7 +423,7 @@ export function StudentsTable({
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <CardTitle>Students Directory</CardTitle>
-            {!readOnly && (
+            {canFullEdit && (
               <Button onClick={() => navigate("/students/new")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Student
@@ -510,7 +529,7 @@ export function StudentsTable({
           </div>
 
           {/* Bulk action bar */}
-          {!readOnly && selectedIds.size > 0 && (
+          {canFullEdit && selectedIds.size > 0 && (
             <div className="flex items-center gap-3 mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <Users className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">
@@ -535,7 +554,7 @@ export function StudentsTable({
           <Table>
             <TableHeader>
               <TableRow>
-                {!readOnly && (
+                {canFullEdit && (
                   <TableHead className="w-10">
                     <Checkbox
                       checked={allFilteredSelected && filteredStudents.length > 0}
@@ -563,7 +582,7 @@ export function StudentsTable({
                       : undefined
                   }
                 >
-                  {!readOnly && (
+                  {canFullEdit && (
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.has(student.student_id)}
@@ -654,7 +673,7 @@ export function StudentsTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    {readOnly ? (
+                    {!canFullEdit ? (
                       <Badge
                         variant={
                           student.status === "active" ? "default" : "secondary"
@@ -692,36 +711,39 @@ export function StudentsTable({
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          navigate(`${detailBasePath}/${student.student_id}`)
-                        }
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {!readOnly && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              navigate(`${detailBasePath}/${student.student_id}/edit`)
-                            }
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openReassignDialog(student)}
-                          >
-                            <UserCog className="h-4 w-4" />
-                          </Button>
-                        </>
+                      {!driverSwitchOnly && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            navigate(`${detailBasePath}/${student.student_id}`)
+                          }
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       )}
-                      {canDeleteStudent && (
+                      {canFullEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            navigate(`${detailBasePath}/${student.student_id}/edit`)
+                          }
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canReassign && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openReassignDialog(student)}
+                          title="Switch driver"
+                        >
+                          <UserCog className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canFullEdit && canDeleteStudent && (
                         <Button
                           variant="ghost"
                           size="sm"

@@ -12,6 +12,9 @@ import {
 import { StudentRouteOrder } from "@/services/routeOrderingService";
 import { getTripAssignmentsForDriver } from "@/services/driverTripService";
 import { useSimpleQuery } from "@/hooks/useSimpleQuery";
+import { useMyFleetOwner } from "@/hooks/useFleetOwners";
+import { useOwnerDrivers } from "@/hooks/useFleetMappings";
+import { downloadCSV } from "@/lib/csvExport";
 import {
   DragDropContext,
   Draggable,
@@ -21,6 +24,7 @@ import {
 import {
   ArrowLeft,
   Car,
+  Download,
   GraduationCap,
   GripVertical,
   Loader2,
@@ -40,12 +44,14 @@ export interface RouteOrderingDetailContentProps {
   readOnly?: boolean;
   listPath?: string;
   linkedSchoolId?: number;
+  allowedDriverIds?: number[];
 }
 
 export function RouteOrderingDetailContent({
   readOnly = false,
   listPath = "/route-ordering",
   linkedSchoolId,
+  allowedDriverIds,
 }: RouteOrderingDetailContentProps) {
   const { driverId, schoolId } = useParams<{
     driverId: string;
@@ -61,6 +67,14 @@ export function RouteOrderingDetailContent({
     linkedSchoolId != null &&
     schoolIdNum > 0 &&
     schoolIdNum !== linkedSchoolId
+  ) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (
+    allowedDriverIds != null &&
+    driverIdNum > 0 &&
+    !allowedDriverIds.includes(driverIdNum)
   ) {
     return <Navigate to="/unauthorized" replace />;
   }
@@ -198,6 +212,32 @@ export function RouteOrderingDetailContent({
     );
   }
 
+  const handleExport = () => {
+    downloadCSV(
+      [
+        "Order",
+        "Student Name",
+        "Class",
+        "Section",
+        "Pickup Address",
+        "Drop Address",
+        "Pickup Order",
+        "Drop Order",
+      ],
+      students.map((student, index) => [
+        index + 1,
+        student.student_name,
+        student.student_class || "",
+        student.student_section || "",
+        student.pickup_address,
+        student.drop_address,
+        student.pickup_order,
+        student.drop_order,
+      ]),
+      `route-order-${route.driver_name}-${route.school_name}-${new Date().toISOString().split("T")[0]}`
+    );
+  };
+
   const studentListItem = (student: StudentRouteOrder, index: number) => (
     <div
       key={student.student_id}
@@ -260,6 +300,10 @@ export function RouteOrderingDetailContent({
               </div>
             </div>
           </div>
+          <Button variant="outline" onClick={handleExport} disabled={students.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
         </div>
 
         {/* Order Type Toggle & Auto Optimize */}
@@ -485,6 +529,34 @@ export function SchoolAdminRouteOrderingDetailPage() {
         readOnly
         listPath="/school-admin/route-ordering"
         linkedSchoolId={linkedSchoolId ?? undefined}
+      />
+    </DashboardLayout>
+  );
+}
+
+export function SubAdminRouteOrderingDetailPage() {
+  const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
+  const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
+    fleetOwner?.owner_id
+  );
+
+  if (loadingOwner || loadingDrivers) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const allowedDriverIds = drivers?.map((d) => d.driver_id) ?? [];
+
+  return (
+    <DashboardLayout>
+      <RouteOrderingDetailContent
+        listPath="/sub-admin/route-ordering"
+        allowedDriverIds={allowedDriverIds}
       />
     </DashboardLayout>
   );

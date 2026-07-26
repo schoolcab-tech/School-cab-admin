@@ -430,7 +430,34 @@ export async function deleteStudent(
 /**
  * Get all students with their details
  */
-export async function getStudents(options?: { schoolId?: number }) {
+export async function getStudents(options?: {
+  schoolId?: number;
+  driverIds?: number[];
+}) {
+  let studentIdsFilter: number[] | undefined;
+
+  if (options?.driverIds != null) {
+    if (options.driverIds.length === 0) {
+      return [];
+    }
+
+    const { data: bookings, error: bookingsError } = await supabase
+      .from("bookings")
+      .select("student_id")
+      .in("driver_id", options.driverIds)
+      .eq("status", "confirmed")
+      .eq("booking_type", "monthly");
+
+    if (bookingsError) {
+      throw new Error(`Error fetching fleet students: ${bookingsError.message}`);
+    }
+
+    studentIdsFilter = [...new Set((bookings || []).map((b) => b.student_id))];
+    if (studentIdsFilter.length === 0) {
+      return [];
+    }
+  }
+
   let query = supabase
     .from("students")
     .select(
@@ -455,6 +482,10 @@ export async function getStudents(options?: { schoolId?: number }) {
 
   if (options?.schoolId != null) {
     query = query.eq("school_id", options.schoolId);
+  }
+
+  if (studentIdsFilter != null) {
+    query = query.in("student_id", studentIdsFilter);
   }
 
   const { data, error } = await query.order("created_at", { ascending: false });

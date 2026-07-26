@@ -31,6 +31,8 @@ interface SchoolDbRow {
   latitude?: number | null;
   longitude?: number | null;
   google_place_id?: string | null;
+  livestream_enabled?: boolean;
+  livestream_quality?: string;
 }
 
 // Type for the database row when creating/updating a school
@@ -87,6 +89,11 @@ const mapDbToSchool = (row: SchoolDbRow): School => {
     latitude: row.latitude ?? null,
     longitude: row.longitude ?? null,
     googlePlaceId: row.google_place_id ?? null,
+    livestreamEnabled: row.livestream_enabled ?? false,
+    livestreamQuality:
+      row.livestream_quality === "480p" || row.livestream_quality === "360p"
+        ? row.livestream_quality
+        : "720p",
   };
 };
 
@@ -111,6 +118,12 @@ const mapSchoolToDb = (
   latitude: school.latitude ?? null,
   longitude: school.longitude ?? null,
   google_place_id: school.googlePlaceId ?? null,
+  ...(school.livestreamEnabled !== undefined
+    ? { livestream_enabled: school.livestreamEnabled }
+    : {}),
+  ...(school.livestreamQuality !== undefined
+    ? { livestream_quality: school.livestreamQuality }
+    : {}),
   ...("school_id" in school ? { school_id: school.school_id } : {}),
 });
 

@@ -496,6 +496,7 @@ export type DriverOperationRow = {
   trip_started_at: string | null;
   school_id: number | null;
   school_name: string | null;
+  livestream_enabled: boolean;
   picked_up_count: number;
   dropped_count: number;
   total_students: number;
@@ -538,7 +539,8 @@ function buildDriverOperationRow(
   live: DriverLiveLocation | undefined,
   trip: ActiveTripForTracking | null,
   stops: TripStop[],
-  completedTripsToday: number
+  completedTripsToday: number,
+  livestreamEnabled = false
 ): DriverOperationRow {
   const isLive = live?.is_live ?? v.is_live;
   const status = live?.status || v.status || "offline";
@@ -593,6 +595,7 @@ function buildDriverOperationRow(
     trip_started_at: trip?.actual_start_time ?? null,
     school_id: trip?.school_id ?? null,
     school_name: trip?.school_name ?? null,
+    livestream_enabled: livestreamEnabled,
     picked_up_count: picked,
     dropped_count: dropped,
     total_students: total,
@@ -722,6 +725,7 @@ async function getCompletedTripsTodayByDriver(opts?: {
  */
 export async function getDriverOperationsOverview(opts?: {
   schoolId?: number;
+  driverIds?: number[];
 }): Promise<DriverOperationRow[]> {
   const { getAllVehicles } = await import("./vehicleService");
 
@@ -731,6 +735,29 @@ export async function getDriverOperationsOverview(opts?: {
     getActiveTripsForTracking(opts),
     getCompletedTripsTodayByDriver(opts),
   ]);
+
+  const driverIdSet = opts?.driverIds?.length
+    ? new Set(opts.driverIds)
+    : null;
+  const filteredVehicles = driverIdSet
+    ? vehicles.filter((v) => driverIdSet.has(v.driver_id))
+    : vehicles;
+
+  const schoolIds = [
+    ...new Set(
+      activeTrips.map((t) => t.school_id).filter((id): id is number => id != null)
+    ),
+  ];
+  const livestreamBySchool = new Map<number, boolean>();
+  if (schoolIds.length > 0) {
+    const { data: schools } = await db
+      .from("schools")
+      .select("school_id, livestream_enabled")
+      .in("school_id", schoolIds);
+    for (const s of schools || []) {
+      livestreamBySchool.set(s.school_id, !!s.livestream_enabled);
+    }
+  }
 
   const liveByDriver = new Map(liveLocations.map((d) => [d.driver_id, d]));
   const tripsByDriver = indexTripsByDriver(activeTrips);
@@ -753,7 +780,7 @@ export async function getDriverOperationsOverview(opts?: {
 
   const needsPlanned: Array<{ driver_id: number; school_id: number; trip_type: string | null }> =
     [];
-  for (const v of vehicles) {
+  for (const v of filteredVehicles) {
     const trip = tripsByDriver.get(v.driver_id) ?? null;
     const existing = stopsByDriver.get(v.driver_id) || [];
     if (existing.length === 0) {
@@ -775,18 +802,28 @@ export async function getDriverOperationsOverview(opts?: {
     }
   }
 
-  return vehicles.map((v) => {
+  return filteredVehicles.map((v) => {
     const live = liveByDriver.get(v.driver_id);
     const trip = tripsByDriver.get(v.driver_id) ?? null;
     const stops = stopsByDriver.get(v.driver_id) || [];
     const completedTripsToday = completedTodayMap.get(v.driver_id) || 0;
-    return buildDriverOperationRow(v, live, trip, stops, completedTripsToday);
+    const livestreamEnabled = trip?.school_id
+      ? livestreamBySchool.get(trip.school_id) ?? false
+      : false;
+    return buildDriverOperationRow(
+      v,
+      live,
+      trip,
+      stops,
+      completedTripsToday,
+      livestreamEnabled
+    );
   });
 }
 
 export async function getDriverOperationById(
   driverId: number,
-  opts?: { schoolId?: number }
+  opts?: { schoolId?: number; driverIds?: number[] }
 ): Promise<DriverOperationRow | null> {
   const rows = await getDriverOperationsOverview(opts);
   return rows.find((r) => r.driver_id === driverId) ?? null;

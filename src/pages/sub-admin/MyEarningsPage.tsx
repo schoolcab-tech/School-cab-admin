@@ -24,6 +24,11 @@ import { DollarSign, TrendingUp, Calendar, Download, Loader2, Filter } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
+import { downloadCSV } from "@/lib/csvExport";
+import {
+  updateSubscriptionPaymentStatus,
+  type PaymentMarkStatus,
+} from "@/services/subAdminPaymentService";
 
 type EarningRecord = {
   subscription_payment_id: number;
@@ -71,9 +76,9 @@ function MyEarningsContent() {
     transactionCount: 0,
   });
   const [loadingEarnings, setLoadingEarnings] = useState(false);
+  const [updatingPaymentId, setUpdatingPaymentId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchEarnings = async () => {
+  const fetchEarnings = async () => {
       if (!drivers || drivers.length === 0) {
         setEarnings([]);
         setSummary({ total: 0, completed: 0, pending: 0, failed: 0, transactionCount: 0 });
@@ -192,8 +197,27 @@ function MyEarningsContent() {
       }
     };
 
+  useEffect(() => {
     fetchEarnings();
   }, [drivers, selectedDriver, selectedMonth, selectedStatus]);
+
+  const handleMarkPayment = async (
+    subscriptionPaymentId: number,
+    status: PaymentMarkStatus
+  ) => {
+    setUpdatingPaymentId(subscriptionPaymentId);
+    try {
+      await updateSubscriptionPaymentStatus(subscriptionPaymentId, status);
+      toast.success(
+        status === "paid" ? "Payment marked as paid" : "Payment marked as unpaid"
+      );
+      await fetchEarnings();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update payment status");
+    } finally {
+      setUpdatingPaymentId(null);
+    }
+  };
 
   const handleDownloadReport = () => {
     if (earnings.length === 0) {
@@ -235,26 +259,7 @@ function MyEarningsContent() {
       `${format(new Date(payment.cycle_start_date), "MMM dd, yyyy")} - ${format(new Date(payment.cycle_end_date), "MMM dd, yyyy")}`,
     ]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `fleet-earnings-${selectedMonth}.csv`
-    );
-    link.style.visibility = "hidden";
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
+    downloadCSV(headers, rows, `fleet-earnings-${selectedMonth}`);
     toast.success("Earnings report downloaded successfully");
   };
 
@@ -449,6 +454,7 @@ function MyEarningsContent() {
                     <TableHead className="text-right">Discount</TableHead>
                     <TableHead>Method</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -501,6 +507,40 @@ function MyEarningsContent() {
                         >
                           {payment.transaction_status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {payment.transaction_status === "pending" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingPaymentId === payment.subscription_payment_id}
+                            onClick={() =>
+                              handleMarkPayment(payment.subscription_payment_id, "paid")
+                            }
+                          >
+                            {updatingPaymentId === payment.subscription_payment_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Mark Paid"
+                            )}
+                          </Button>
+                        )}
+                        {payment.transaction_status === "completed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingPaymentId === payment.subscription_payment_id}
+                            onClick={() =>
+                              handleMarkPayment(payment.subscription_payment_id, "unpaid")
+                            }
+                          >
+                            {updatingPaymentId === payment.subscription_payment_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Mark Unpaid"
+                            )}
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

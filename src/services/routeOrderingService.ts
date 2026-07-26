@@ -42,7 +42,12 @@ export interface DriverSchoolRouteSummary {
  */
 export async function getAllDriverSchoolRoutes(options?: {
   schoolId?: number;
+  driverIds?: number[];
 }): Promise<DriverSchoolRouteSummary[]> {
+  if (options?.driverIds != null && options.driverIds.length === 0) {
+    return [];
+  }
+
   let query = supabase
     .from("bookings")
     .select(
@@ -64,6 +69,10 @@ export async function getAllDriverSchoolRoutes(options?: {
 
   if (options?.schoolId != null) {
     query = query.eq("school_id", options.schoolId);
+  }
+
+  if (options?.driverIds != null) {
+    query = query.in("driver_id", options.driverIds);
   }
 
   const { data, error } = await query;

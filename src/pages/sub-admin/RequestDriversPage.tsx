@@ -37,8 +37,10 @@ import {
   useAvailableDrivers,
 } from "@/hooks/useDriverAssignmentRequests";
 import { useState } from "react";
-import { Loader2, Plus, UserPlus, UserMinus, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Loader2, Plus, UserPlus, UserMinus, Clock, CheckCircle, XCircle, AlertCircle, Download } from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
+import { downloadCSV } from "@/lib/csvExport";
+import { toast } from "sonner";
 
 export default function RequestDriversPage() {
   return (
@@ -58,6 +60,27 @@ function RequestDriversContent() {
 
   const pendingCount = requests?.filter(r => r.status === 'pending').length || 0;
 
+  const handleExportRequests = () => {
+    if (!requests || requests.length === 0) {
+      toast.error("No requests to export");
+      return;
+    }
+    downloadCSV(
+      ["Type", "Driver", "Cab Number", "Reason", "Status", "Requested At", "Admin Notes"],
+      requests.map((request) => [
+        request.request_type,
+        request.driver?.name || "Any available",
+        request.driver?.cab_number || "",
+        request.reason,
+        request.status,
+        format(new Date(request.requested_at), "MMM dd, yyyy HH:mm"),
+        request.admin_notes || "",
+      ]),
+      `driver-requests-${new Date().toISOString().split("T")[0]}`
+    );
+    toast.success("Requests exported successfully");
+  };
+
   if (loadingOwner || loadingRequests) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -68,13 +91,14 @@ function RequestDriversContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Driver Requests</h1>
           <p className="text-muted-foreground">
             Request driver assignments or unassignments
           </p>
         </div>
+        <div className="flex gap-2">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -92,6 +116,11 @@ function RequestDriversContent() {
             />
           </DialogContent>
         </Dialog>
+        <Button variant="outline" onClick={handleExportRequests} disabled={!requests?.length}>
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

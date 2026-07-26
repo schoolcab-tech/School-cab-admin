@@ -36,6 +36,7 @@ import {
   School,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { LiveStreamViewer } from "./LiveStreamViewer";
 import {
   FitMapBounds,
   GpsBadge,
@@ -49,6 +50,7 @@ export interface DriverTrackingDetailProps {
   driverId: number;
   listPath: string;
   schoolId?: number;
+  driverIds?: number[];
   schoolCenter?: { latitude: number; longitude: number; name: string } | null;
   refetchInterval?: number;
 }
@@ -57,6 +59,7 @@ export function DriverTrackingDetail({
   driverId,
   listPath,
   schoolId,
+  driverIds,
   schoolCenter,
   refetchInterval = 15000,
 }: DriverTrackingDetailProps) {
@@ -66,8 +69,8 @@ export function DriverTrackingDetail({
     error,
     refetch,
   } = useSimpleQuery<DriverOperationRow | null>(
-    () => getDriverOperationById(driverId, { schoolId }),
-    [driverId, schoolId],
+    () => getDriverOperationById(driverId, { schoolId, driverIds }),
+    [driverId, schoolId, driverIds?.join(",")],
     { refetchInterval }
   );
 
@@ -187,9 +190,21 @@ export function DriverTrackingDetail({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <PhaseBadge phase={driver.phase} />
           <GpsBadge isLive={driver.is_live} minutesSince={driver.minutes_since_last_seen} />
+          {driver.livestream_enabled &&
+            driver.school_id != null &&
+            driver.phase === "on_trip" && (
+              <LiveStreamViewer
+                driverId={driver.driver_id}
+                schoolId={driver.school_id}
+                driverName={driver.driver_name}
+                variant="dialog"
+                showWhenOnTrip={false}
+                isOnTrip
+              />
+            )}
           <Button variant="outline" size="icon" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -246,6 +261,19 @@ export function DriverTrackingDetail({
           </CardContent>
         </Card>
       )}
+
+      {driver.livestream_enabled &&
+        driver.school_id != null &&
+        driver.phase === "on_trip" && (
+          <LiveStreamViewer
+            driverId={driver.driver_id}
+            schoolId={driver.school_id}
+            driverName={driver.driver_name}
+            variant="inline"
+            showWhenOnTrip={false}
+            isOnTrip
+          />
+        )}
 
       <div className="grid gap-4 xl:grid-cols-5">
         <Card className="xl:col-span-3">

@@ -43,12 +43,14 @@ type PendingFilter = "all" | "has_next" | "no_pending";
 
 export interface DriverOperationsViewProps {
   schoolId?: number;
+  driverIds?: number[];
   detailPathPrefix: string;
   refetchInterval?: number;
 }
 
 export function DriverOperationsView({
   schoolId,
+  driverIds,
   detailPathPrefix,
   refetchInterval = 15000,
 }: DriverOperationsViewProps) {
@@ -66,8 +68,8 @@ export function DriverOperationsView({
     error,
     refetch,
   } = useSimpleQuery<DriverOperationRow[]>(
-    () => getDriverOperationsOverview({ schoolId }),
-    [schoolId],
+    () => getDriverOperationsOverview({ schoolId, driverIds }),
+    [schoolId, driverIds?.join(",")],
     { refetchInterval }
   );
 

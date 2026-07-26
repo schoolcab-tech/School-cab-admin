@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   Bell,
   Car,
@@ -219,6 +220,24 @@ const navigationItems: NavItem[] = [
     title: "My Fleet",
     url: "/sub-admin/my-fleet",
     icon: Truck,
+    roles: ['sub_admin'],
+  },
+  {
+    title: "Switch Drivers",
+    url: "/sub-admin/students",
+    icon: Users,
+    roles: ['sub_admin'],
+  },
+  {
+    title: "Route Ordering",
+    url: "/sub-admin/route-ordering",
+    icon: Route,
+    roles: ['sub_admin'],
+  },
+  {
+    title: "Live Tracking",
+    url: "/sub-admin/live-tracking",
+    icon: Activity,
     roles: ['sub_admin'],
   },
   {

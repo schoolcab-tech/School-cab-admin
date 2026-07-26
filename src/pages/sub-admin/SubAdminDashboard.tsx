@@ -2,10 +2,12 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useOwnerDrivers } from "@/hooks/useFleetMappings";
-import { Car, Users, TrendingUp, DollarSign, Loader2 } from "lucide-react";
+import { Car, Users, TrendingUp, DollarSign, Loader2, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { downloadCSV } from "@/lib/csvExport";
 
 export default function SubAdminDashboard() {
   return (
@@ -103,15 +105,36 @@ function SubAdminDashboardContent() {
     );
   }
 
+  const handleExportDashboard = () => {
+    if (!drivers || drivers.length === 0) return;
+    downloadCSV(
+      ["Driver Name", "Cab Number", "Vehicle Type", "Status", "Rating"],
+      drivers.map((driver) => [
+        driver.name,
+        driver.cab_number,
+        driver.vehicle_type,
+        driver.is_verified ? "Active" : "Pending",
+        driver.avg_rating?.toFixed(1) || "N/A",
+      ]),
+      `fleet-dashboard-${new Date().toISOString().split("T")[0]}`
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome, {fleetOwner.company_name}
-        </h1>
-        <p className="text-muted-foreground">
-          Manage your fleet and track performance
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome, {fleetOwner.company_name}
+          </h1>
+          <p className="text-muted-foreground">
+            Manage your fleet and track performance
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleExportDashboard} disabled={!drivers?.length}>
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
       {/* Stats Cards */}

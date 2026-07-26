@@ -28,7 +28,7 @@ import {
   User,
   MapPin as MapPinIcon,
   Compass,
-  Loader2,
+  Video,
 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -195,7 +195,7 @@ export default function SchoolDetail() {
 
           {/* ── Overview ── */}
           <TabsContent value="overview">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <h3 className="text-sm font-medium">Total Students</h3>
@@ -223,6 +223,24 @@ export default function SchoolDetail() {
                   <div className="text-2xl font-bold">{school.driverCount?.toLocaleString() || 'N/A'}</div>
                 </CardContent>
               </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium">Live Streaming</h3>
+                  <Video className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-1">
+                    <Badge variant={school.livestreamEnabled ? 'default' : 'secondary'}>
+                      {school.livestreamEnabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                    {school.livestreamEnabled && (
+                      <span className="text-xs text-muted-foreground mt-1">
+                        Quality: {school.livestreamQuality}
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             <Card className="mt-4">
@@ -232,6 +250,14 @@ export default function SchoolDetail() {
                   <div>
                     <h3 className="text-sm font-medium">School Code</h3>
                     <p className="text-muted-foreground">{school.code}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium">Live cab streaming</h3>
+                    <p className="text-muted-foreground">
+                      {school.livestreamEnabled
+                        ? `Enabled — ${school.livestreamQuality} quality`
+                        : 'Disabled for this school'}
+                    </p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium">Operating Hours</h3>

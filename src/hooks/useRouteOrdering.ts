@@ -11,13 +11,17 @@ import {
 import { useSimpleQuery } from "./useSimpleQuery";
 import { useSimpleMutation } from "./useSimpleMutation";
 
-export const useDriverSchoolRoutes = (schoolId?: number) => {
+export const useDriverSchoolRoutes = (
+  schoolId?: number,
+  driverIds?: number[]
+) => {
   return useSimpleQuery<DriverSchoolRouteSummary[]>(
     () =>
-      getAllDriverSchoolRoutes(
-        schoolId != null ? { schoolId } : undefined
-      ),
-    [schoolId]
+      getAllDriverSchoolRoutes({
+        ...(schoolId != null ? { schoolId } : {}),
+        ...(driverIds != null ? { driverIds } : {}),
+      }),
+    [schoolId, driverIds?.join(",")]
   );
 };
 

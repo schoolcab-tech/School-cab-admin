@@ -12,11 +12,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/contexts/auth-context";
+import { useMyFleetOwner } from "@/hooks/useFleetOwners";
+import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useDriverSchoolRoutes } from "@/hooks/useRouteOrdering";
+import { downloadCSV } from "@/lib/csvExport";
 import {
   ArrowRight,
   Bus,
   Car,
+  Download,
   GraduationCap,
   Eye,
   Loader2,
@@ -29,16 +33,21 @@ import { useNavigate } from "react-router-dom";
 
 export interface RouteOrderingContentProps {
   schoolId?: number;
+  driverIds?: number[];
   readOnly?: boolean;
   basePath?: string;
 }
 
 export function RouteOrderingContent({
   schoolId,
+  driverIds,
   readOnly = false,
   basePath = "/route-ordering",
 }: RouteOrderingContentProps) {
-  const { data: routes = [], isLoading, error } = useDriverSchoolRoutes(schoolId);
+  const { data: routes = [], isLoading, error } = useDriverSchoolRoutes(
+    schoolId,
+    driverIds
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
@@ -51,15 +60,35 @@ export function RouteOrderingContent({
   const routesWithCustomOrder = routes.filter((r) => r.has_custom_order).length;
   const totalStudents = routes.reduce((sum, r) => sum + r.student_count, 0);
 
+  const handleExport = () => {
+    if (routes.length === 0) return;
+    downloadCSV(
+      ["Driver", "School", "Students", "Order Status"],
+      routes.map((route) => [
+        route.driver_name,
+        route.school_name,
+        route.student_count,
+        route.has_custom_order ? "Custom Order" : "Default Order",
+      ]),
+      `route-ordering-${new Date().toISOString().split("T")[0]}`
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Route Ordering</h1>
-        <p className="text-muted-foreground">
-          {readOnly
-            ? "View pickup and drop-off order for drivers serving your school."
-            : "Configure pickup and drop-off order for students per driver per school."}
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Route Ordering</h1>
+          <p className="text-muted-foreground">
+            {readOnly
+              ? "View pickup and drop-off order for drivers serving your school."
+              : "Configure pickup and drop-off order for students per driver per school."}
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleExport} disabled={routes.length === 0}>
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -266,6 +295,40 @@ export function SchoolAdminRouteOrderingPage() {
       ) : (
         <div className="text-center py-12 text-muted-foreground">
           No school linked to your account.
+        </div>
+      )}
+    </DashboardLayout>
+  );
+}
+
+export function SubAdminRouteOrderingPage() {
+  const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
+  const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
+    fleetOwner?.owner_id
+  );
+
+  if (loadingOwner || loadingDrivers) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const driverIds = drivers?.map((d) => d.driver_id) ?? [];
+
+  return (
+    <DashboardLayout>
+      {driverIds.length > 0 ? (
+        <RouteOrderingContent
+          driverIds={driverIds}
+          basePath="/sub-admin/route-ordering"
+        />
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          No drivers assigned to your fleet yet. Request drivers to manage route ordering.
         </div>
       )}
     </DashboardLayout>

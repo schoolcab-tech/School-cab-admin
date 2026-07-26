@@ -7,10 +7,14 @@ import {
 import { useSimpleMutation } from "./useSimpleMutation";
 import { useSimpleQuery } from "./useSimpleQuery";
 
-export const useStudents = (schoolId?: number) => {
+export const useStudents = (schoolId?: number, driverIds?: number[]) => {
   return useSimpleQuery(
-    () => getStudents(schoolId != null ? { schoolId } : undefined),
-    [schoolId]
+    () =>
+      getStudents({
+        ...(schoolId != null ? { schoolId } : {}),
+        ...(driverIds != null ? { driverIds } : {}),
+      }),
+    [schoolId, driverIds?.join(",")]
   );
 };
 

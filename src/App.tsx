@@ -42,7 +42,7 @@ import Settings from "./pages/Settings";
 import StudentDetailPage, {
   SchoolAdminStudentDetailPage,
 } from "./pages/students/StudentDetailPage";
-import Students, { SchoolAdminStudentsPage } from "./pages/Students";
+import Students, { SchoolAdminStudentsPage, SubAdminStudentsPage } from "./pages/Students";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import Unauthorized from "./pages/Unauthorized";
 import AddStudentPage from "./pages/students/AddStudentPage";
@@ -55,11 +55,15 @@ import BookingDetailPage, {
 } from "./pages/bookings/BookingDetailPage";
 import RouteOrderingPage, {
   SchoolAdminRouteOrderingPage,
+  SubAdminRouteOrderingPage,
 } from "./pages/route-ordering/RouteOrderingPage";
 import RouteOrderingDetailPage, {
   SchoolAdminRouteOrderingDetailPage,
+  SubAdminRouteOrderingDetailPage,
 } from "./pages/route-ordering/RouteOrderingDetailPage";
-import DriverTripManagement from "./pages/route-ordering/DriverTripManagement";
+import DriverTripManagement, {
+  SubAdminDriverTripManagement,
+} from "./pages/route-ordering/DriverTripManagement";
 
 // Trip Schedules Page
 import TripSchedulesPage, {
@@ -88,6 +92,7 @@ import MyEarningsPage from "./pages/sub-admin/MyEarningsPage";
 import MyFleetPage from "./pages/sub-admin/MyFleetPage";
 import RequestDriversPage from "./pages/sub-admin/RequestDriversPage";
 import SubAdminDashboard from "./pages/sub-admin/SubAdminDashboard";
+import SubAdminLiveTrackingPage from "./pages/sub-admin/SubAdminLiveTrackingPage";
 
 // School Admin Pages
 import SchoolAdminDashboard from "./pages/school-admin/SchoolAdminDashboard";
@@ -685,6 +690,54 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["sub_admin"]}>
             <MyEarningsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/sub-admin/live-tracking"
+        element={
+          <RoleBasedRoute allowedRoles={["sub_admin"]}>
+            <SubAdminLiveTrackingPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/sub-admin/live-tracking/:driverId"
+        element={
+          <RoleBasedRoute allowedRoles={["sub_admin"]}>
+            <DriverTrackingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/sub-admin/students"
+        element={
+          <RoleBasedRoute allowedRoles={["sub_admin"]}>
+            <SubAdminStudentsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/sub-admin/route-ordering"
+        element={
+          <RoleBasedRoute allowedRoles={["sub_admin"]}>
+            <SubAdminRouteOrderingPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/sub-admin/route-ordering/:driverId/:schoolId"
+        element={
+          <RoleBasedRoute allowedRoles={["sub_admin"]}>
+            <SubAdminRouteOrderingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/sub-admin/route-ordering/:driverId/:schoolId/trips"
+        element={
+          <RoleBasedRoute allowedRoles={["sub_admin"]}>
+            <SubAdminDriverTripManagement />
           </RoleBasedRoute>
         }
       />

@@ -4,111 +4,119 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/auth-context";
+import { useMyFleetOwner } from "@/hooks/useFleetOwners";
+import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useStudents } from "@/hooks/useStudents";
+import { downloadCSV } from "@/lib/csvExport";
 import { Student } from "@/types/student";
-import { Download, Plus, RefreshCw, Upload } from "lucide-react";
+import { Download, Loader2, Plus, RefreshCw, Upload } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function exportStudentsToCSV(students: Student[]) {
-  const headers = [
-    "Student ID",
-    "Name",
-    "Class",
-    "Section",
-    "School Name",
-    "Phone Number",
-    "Pickup Address",
-    "Pickup Pincode",
-    "Pickup Time",
-    "Drop Address",
-    "Drop Pincode",
-    "Drop Time",
-    "Assigned Driver",
-    "Driver Phone",
-    "Driver Cab Number",
-    "Driver Vehicle Type",
-    "Status",
-    "Created At",
-  ];
-
-  const escapeCSV = (value: string | undefined | null) => {
-    if (value == null) return "";
-    const str = String(value);
-    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
-
-  const rows = students.map((s) => [
-    s.student_id,
-    escapeCSV(s.name),
-    escapeCSV(s.class),
-    escapeCSV(s.section),
-    escapeCSV(s.schools?.name),
-    // @ts-expect-error - phone_number exists in DB but not in type
-    escapeCSV(s.phone_number || s.phone),
-    escapeCSV(s.pickup_address),
-    escapeCSV(s.pickup_pincode),
-    escapeCSV(s.pickup_time),
-    escapeCSV(s.drop_address),
-    escapeCSV(s.drop_pincode),
-    escapeCSV(s.drop_time),
-    escapeCSV(s.assigned_driver?.name),
-    escapeCSV(s.assigned_driver?.phone),
-    escapeCSV(s.assigned_driver?.cab_number),
-    escapeCSV(s.assigned_driver?.vehicle_type),
-    escapeCSV(s.status || "unknown"),
-    escapeCSV(s.created_at ? new Date(s.created_at).toLocaleDateString() : ""),
-  ]);
-
-  const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-
-  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `students_export_${new Date().toISOString().split("T")[0]}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadCSV(
+    [
+      "Student ID",
+      "Name",
+      "Class",
+      "Section",
+      "School Name",
+      "Phone Number",
+      "Pickup Address",
+      "Pickup Pincode",
+      "Pickup Time",
+      "Drop Address",
+      "Drop Pincode",
+      "Drop Time",
+      "Assigned Driver",
+      "Driver Phone",
+      "Driver Cab Number",
+      "Driver Vehicle Type",
+      "Status",
+      "Created At",
+    ],
+    students.map((s) => [
+      s.student_id,
+      s.name,
+      s.class,
+      s.section,
+      s.schools?.name,
+      // @ts-expect-error - phone_number exists in DB but not in type
+      s.phone_number || s.phone,
+      s.pickup_address,
+      s.pickup_pincode,
+      s.pickup_time,
+      s.drop_address,
+      s.drop_pincode,
+      s.drop_time,
+      s.assigned_driver?.name,
+      s.assigned_driver?.phone,
+      s.assigned_driver?.cab_number,
+      s.assigned_driver?.vehicle_type,
+      s.status || "unknown",
+      s.created_at ? new Date(s.created_at).toLocaleDateString() : "",
+    ]),
+    `students_export_${new Date().toISOString().split("T")[0]}`
+  );
 }
 
 export interface StudentsContentProps {
   schoolId?: number;
+  driverIds?: number[];
+  fleetDrivers?: Array<{
+    driver_id: number;
+    name?: string | null;
+    cab_number: string;
+    vehicle_type?: string;
+  }>;
+  driverSwitchOnly?: boolean;
   readOnly?: boolean;
   detailBasePath?: string;
+  title?: string;
+  description?: string;
 }
 
 export function StudentsContent({
   schoolId,
+  driverIds,
+  fleetDrivers,
+  driverSwitchOnly = false,
   readOnly = false,
   detailBasePath = "/students",
+  title,
+  description,
 }: StudentsContentProps) {
   const navigate = useNavigate();
-  const { data: students = [] } = useStudents(schoolId);
+  const { data: students = [] } = useStudents(schoolId, driverIds);
   const [activeTab, setActiveTab] = useState("all");
 
   const totalStudents = students.length;
   const activeStudents = students.filter((s) => s.status === "active").length;
   const withoutDrivers = students.filter((s) => !s.assigned_driver).length;
+  const canFullEdit = !readOnly && !driverSwitchOnly;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {schoolId ? "Students" : "Students Management"}
+            {title ??
+              (schoolId
+                ? "Students"
+                : driverSwitchOnly
+                  ? "Switch Drivers"
+                  : "Students Management")}
           </h1>
           <p className="text-muted-foreground">
-            {schoolId
-              ? "View enrolled students and their transport assignments."
-              : "Manage student profiles, school assignments, and driver allocations."}
+            {description ??
+              (driverSwitchOnly
+                ? "Reassign students between drivers in your fleet."
+                : schoolId
+                  ? "View enrolled students and their transport assignments."
+                  : "Manage student profiles, school assignments, and driver allocations.")}
           </p>
         </div>
-        {!readOnly && (
+        {canFullEdit && (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -132,7 +140,7 @@ export function StudentsContent({
             </Button>
           </div>
         )}
-        {readOnly && (
+        {(readOnly || driverSwitchOnly) && (
           <Button
             variant="outline"
             onClick={() => exportStudentsToCSV(students)}
@@ -191,6 +199,9 @@ export function StudentsContent({
           <StudentsTable
             statusTab="all"
             schoolId={schoolId}
+            driverIds={driverIds}
+            fleetDrivers={fleetDrivers}
+            driverSwitchOnly={driverSwitchOnly}
             readOnly={readOnly}
             detailBasePath={detailBasePath}
           />
@@ -199,6 +210,9 @@ export function StudentsContent({
           <StudentsTable
             statusTab="active"
             schoolId={schoolId}
+            driverIds={driverIds}
+            fleetDrivers={fleetDrivers}
+            driverSwitchOnly={driverSwitchOnly}
             readOnly={readOnly}
             detailBasePath={detailBasePath}
           />
@@ -207,6 +221,9 @@ export function StudentsContent({
           <StudentsTable
             statusTab="inactive"
             schoolId={schoolId}
+            driverIds={driverIds}
+            fleetDrivers={fleetDrivers}
+            driverSwitchOnly={driverSwitchOnly}
             readOnly={readOnly}
             detailBasePath={detailBasePath}
           />
@@ -237,6 +254,41 @@ export function SchoolAdminStudentsPage() {
       ) : (
         <div className="text-center py-12 text-muted-foreground">
           No school linked to your account.
+        </div>
+      )}
+    </DashboardLayout>
+  );
+}
+
+export function SubAdminStudentsPage() {
+  const { data: fleetOwner, isLoading: loadingOwner } = useMyFleetOwner();
+  const { data: drivers, isLoading: loadingDrivers } = useOwnerDrivers(
+    fleetOwner?.owner_id
+  );
+
+  if (loadingOwner || loadingDrivers) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const driverIds = drivers?.map((d) => d.driver_id) ?? [];
+
+  return (
+    <DashboardLayout>
+      {driverIds.length > 0 ? (
+        <StudentsContent
+          driverIds={driverIds}
+          fleetDrivers={drivers}
+          driverSwitchOnly
+        />
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          No drivers assigned to your fleet yet. Request drivers to manage student assignments.
         </div>
       )}
     </DashboardLayout>

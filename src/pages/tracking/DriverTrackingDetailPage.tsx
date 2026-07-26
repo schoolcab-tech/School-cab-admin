@@ -3,7 +3,11 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { DriverTrackingDetail } from "@/components/tracking/DriverTrackingDetail";
 import { useAuth } from "@/contexts/auth-context";
 import { useMySchoolAdmin } from "@/hooks/useSchoolAdmins";
+import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useSchool } from "@/hooks/useSchools";
+import { useSimpleQuery } from "@/hooks/useSimpleQuery";
+import { getDriversByOwnerId } from "@/services/fleetMappingService";
+import { Loader2 } from "lucide-react";
 
 export default function DriverTrackingDetailPage() {
   return (
@@ -18,8 +22,20 @@ function Content() {
   const location = useLocation();
   const { linkedSchoolId } = useAuth();
   const { data: profile } = useMySchoolAdmin();
+  const { data: owner } = useMyFleetOwner();
+  const { data: fleetDrivers = [] } = useSimpleQuery(
+    () => getDriversByOwnerId(owner!.owner_id),
+    [owner?.owner_id],
+    { enabled: !!owner?.owner_id }
+  );
+
   const isSchoolAdmin = location.pathname.startsWith("/school-admin");
-  const listPath = isSchoolAdmin ? "/school-admin/live-tracking" : "/master-admin/live-tracking";
+  const isSubAdmin = location.pathname.startsWith("/sub-admin");
+  const listPath = isSubAdmin
+    ? "/sub-admin/live-tracking"
+    : isSchoolAdmin
+      ? "/school-admin/live-tracking"
+      : "/master-admin/live-tracking";
 
   const { data: school } = useSchool(
     isSchoolAdmin && linkedSchoolId ? String(linkedSchoolId) : ""
@@ -35,6 +51,22 @@ function Content() {
     return (
       <div className="text-center py-12 text-muted-foreground">
         School not linked to your account.
+      </div>
+    );
+  }
+
+  if (isSubAdmin && !owner) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">Fleet owner profile not found.</div>
+    );
+  }
+
+  const fleetDriverIds = isSubAdmin ? fleetDrivers.map((d) => d.driver_id) : undefined;
+
+  if (isSubAdmin && fleetDriverIds && !fleetDriverIds.includes(Number(driverId))) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        This driver is not in your fleet.
       </div>
     );
   }
@@ -55,6 +87,7 @@ function Content() {
         driverId={Number(driverId)}
         listPath={listPath}
         schoolId={isSchoolAdmin ? linkedSchoolId ?? undefined : undefined}
+        driverIds={fleetDriverIds}
         schoolCenter={
           isSchoolAdmin &&
           schoolLat != null &&

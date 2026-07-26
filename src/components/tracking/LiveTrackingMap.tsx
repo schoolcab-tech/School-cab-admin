@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { LiveStreamViewer } from "./LiveStreamViewer";
 
 /* ── Marker icons ─────────────────────────────────────────────────── */
 
@@ -126,6 +127,7 @@ function PanToDriver({ driver }: { driver: DriverLiveLocation | null }) {
 
 export interface LiveTrackingMapProps {
   schoolId?: number;
+  driverIds?: number[];
   schoolCenter?: { latitude: number; longitude: number; name: string } | null;
   detailPathPrefix?: string;
   refetchInterval?: number;
@@ -139,6 +141,7 @@ const driverDisplayStatus = (d: DriverLiveLocation): "online" | "on_trip" | "ina
 
 export function LiveTrackingMap({
   schoolId,
+  driverIds,
   schoolCenter,
   detailPathPrefix,
   refetchInterval = 15000,
@@ -194,9 +197,15 @@ export function LiveTrackingMap({
     { enabled: stopSessionIds.length > 0, refetchInterval }
   );
 
+  const scopedDrivers = useMemo(() => {
+    if (!driverIds?.length) return drivers;
+    const allowed = new Set(driverIds);
+    return drivers.filter((d) => allowed.has(d.driver_id));
+  }, [drivers, driverIds]);
+
   const visibleDrivers = useMemo(
-    () => (hideInactive ? drivers.filter((d) => d.is_live) : drivers),
-    [drivers, hideInactive]
+    () => (hideInactive ? scopedDrivers.filter((d) => d.is_live) : scopedDrivers),
+    [scopedDrivers, hideInactive]
   );
 
   const visibleStops = useMemo(() => {
@@ -208,12 +217,19 @@ export function LiveTrackingMap({
   }, [tripStops, showAllStops, selectedDriverId]);
 
   const summary = useMemo(() => {
-    const live = drivers.filter((d) => d.is_live).length;
-    const onTrip = drivers.filter((d) => d.is_live && d.status === "on_trip").length;
-    const online = drivers.filter((d) => d.is_live && d.status === "online").length;
-    const inactive = drivers.length - live;
-    return { live, onTrip, online, inactive, total: drivers.length, activeTrips: activeTrips.length };
-  }, [drivers, activeTrips]);
+    const live = scopedDrivers.filter((d) => d.is_live).length;
+    const onTrip = scopedDrivers.filter((d) => d.is_live && d.status === "on_trip").length;
+    const online = scopedDrivers.filter((d) => d.is_live && d.status === "online").length;
+    const inactive = scopedDrivers.length - live;
+    return {
+      live,
+      onTrip,
+      online,
+      inactive,
+      total: scopedDrivers.length,
+      activeTrips: activeTrips.length,
+    };
+  }, [scopedDrivers, activeTrips]);
 
   const fitPoints = useMemo<[number, number][]>(() => {
     const pts: [number, number][] = visibleDrivers.map((d) => [d.latitude, d.longitude]);
@@ -615,6 +631,17 @@ function DriverDetailPanel({
           <Button variant="default" size="sm" className="w-full" asChild>
             <Link to={detailPath}>Open full tracking</Link>
           </Button>
+        )}
+
+        {trip?.school_id && driver.status === "on_trip" && (
+          <LiveStreamViewer
+            driverId={driver.driver_id}
+            schoolId={trip.school_id}
+            driverName={driver.driver_name}
+            variant="dialog"
+            showWhenOnTrip={false}
+            isOnTrip
+          />
         )}
       </CardContent>
     </Card>

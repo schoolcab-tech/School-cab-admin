@@ -6,6 +6,7 @@ import { LayoutList, Map } from "lucide-react";
 
 export interface LiveTrackingTabsProps {
   schoolId?: number;
+  driverIds?: number[];
   schoolCenter?: { latitude: number; longitude: number; name: string } | null;
   detailPathPrefix: string;
   refetchInterval?: number;
@@ -13,6 +14,7 @@ export interface LiveTrackingTabsProps {
 
 export function LiveTrackingTabs({
   schoolId,
+  driverIds,
   schoolCenter,
   detailPathPrefix,
   refetchInterval = 15000,
@@ -37,12 +39,14 @@ export function LiveTrackingTabs({
       {view === "table" ? (
         <DriverOperationsView
           schoolId={schoolId}
+          driverIds={driverIds}
           detailPathPrefix={detailPathPrefix}
           refetchInterval={refetchInterval}
         />
       ) : (
         <LiveTrackingMap
           schoolId={schoolId}
+          driverIds={driverIds}
           schoolCenter={schoolCenter}
           detailPathPrefix={detailPathPrefix}
           refetchInterval={refetchInterval}
