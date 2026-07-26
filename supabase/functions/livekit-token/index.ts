@@ -8,7 +8,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-type Role = "driver" | "parent" | "admin" | "sub_admin";
+type Role = "driver" | "parent" | "admin" | "sub_admin" | "school_admin";
 
 interface TokenRequest {
   role: Role;
@@ -64,10 +64,17 @@ serve(async (req) => {
     }
 
     const body = (await req.json()) as TokenRequest;
-    const { role, driverId, schoolId, studentId } = body;
+    const role = body.role;
+    const driverId = Number(body.driverId);
+    const schoolId = Number(body.schoolId);
+    const studentId =
+      body.studentId != null ? Number(body.studentId) : undefined;
 
-    if (!role || !driverId || !schoolId) {
-      return jsonResponse({ error: "role, driverId, and schoolId are required" }, 400);
+    if (!role || !Number.isFinite(driverId) || !Number.isFinite(schoolId)) {
+      return jsonResponse(
+        { error: "role, driverId, and schoolId are required" },
+        400
+      );
     }
 
     const { data: school, error: schoolError } = await adminClient
@@ -159,13 +166,23 @@ serve(async (req) => {
       identity = `admin-${user.id}`;
       canSubscribe = true;
     } else if (role === "sub_admin") {
+      const { data: roles } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      const hasSubAdminRole = (roles || []).some((r) => r.role === "sub_admin");
+      if (!hasSubAdminRole) {
+        return jsonResponse({ error: "Fleet owner access required" }, 403);
+      }
+
       const { data: owner } = await adminClient
         .from("fleet_owners")
-        .select("owner_id")
+        .select("owner_id, is_active")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (!owner) {
+      if (!owner || owner.is_active === false) {
         return jsonResponse({ error: "Fleet owner profile not found" }, 403);
       }
 
@@ -182,6 +199,36 @@ serve(async (req) => {
       }
 
       identity = `subadmin-${user.id}`;
+      canSubscribe = true;
+    } else if (role === "school_admin") {
+      const { data: schoolAdmin } = await adminClient
+        .from("school_admins")
+        .select("school_id, is_active")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!schoolAdmin || schoolAdmin.is_active === false) {
+        return jsonResponse({ error: "School admin profile not found" }, 403);
+      }
+
+      if (Number(schoolAdmin.school_id) !== schoolId) {
+        return jsonResponse({ error: "Driver is not serving your school" }, 403);
+      }
+
+      const { data: booking } = await adminClient
+        .from("bookings")
+        .select("booking_id")
+        .eq("driver_id", driverId)
+        .eq("school_id", schoolId)
+        .eq("status", "confirmed")
+        .limit(1)
+        .maybeSingle();
+
+      if (!booking) {
+        return jsonResponse({ error: "Driver is not assigned to your school" }, 403);
+      }
+
+      identity = `schooladmin-${user.id}`;
       canSubscribe = true;
     } else {
       return jsonResponse({ error: "Invalid role" }, 400);

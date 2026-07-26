@@ -1,7 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type LiveKitQuality = "720p" | "480p" | "360p";
-export type LiveKitViewerRole = "admin" | "sub_admin";
+export type LiveKitViewerRole = "admin" | "sub_admin" | "school_admin";
+
+/** Map panel auth role → livekit-token edge function role. */
+export function resolveLiveKitViewerRole(
+  userRole: string | null | undefined
+): LiveKitViewerRole {
+  if (userRole === "sub_admin") return "sub_admin";
+  if (userRole === "school_admin") return "school_admin";
+  return "admin";
+}
 
 export interface LiveKitTokenResult {
   token: string;

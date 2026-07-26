@@ -19,7 +19,7 @@ import {
 import {
   getAdminLiveKitToken,
   LIVEKIT_URL,
-  type LiveKitViewerRole,
+  resolveLiveKitViewerRole,
 } from "@/services/livekitTokenService";
 import { Loader2, Radio, RefreshCw, Video, VideoOff } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
@@ -110,8 +110,8 @@ export function LiveStreamViewer({
   showWhenOnTrip = true,
   isOnTrip = false,
 }: LiveStreamViewerProps) {
-  const { isSubAdmin } = useAuth();
-  const role: LiveKitViewerRole = isSubAdmin ? "sub_admin" : "admin";
+  const { userRole, loading: authLoading } = useAuth();
+  const role = resolveLiveKitViewerRole(userRole);
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +126,10 @@ export function LiveStreamViewer({
   };
 
   const fetchToken = useCallback(async () => {
+    if (authLoading || !userRole) {
+      setError("Session still loading. Please try again.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -141,7 +145,7 @@ export function LiveStreamViewer({
     } finally {
       setLoading(false);
     }
-  }, [driverId, schoolId, role]);
+  }, [authLoading, driverId, schoolId, role, userRole]);
 
   const startWatching = () => {
     if (variant === "dialog") {
@@ -170,7 +174,7 @@ export function LiveStreamViewer({
       size="sm"
       className="gap-2"
       onClick={startWatching}
-      disabled={loading}
+      disabled={loading || authLoading || !userRole}
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />
