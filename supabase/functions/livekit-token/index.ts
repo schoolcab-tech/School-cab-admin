@@ -115,25 +115,29 @@ serve(async (req) => {
         return jsonResponse({ error: "studentId is required for parent role" }, 400);
       }
 
+      // Accept confirmed or in_progress bookings
       const { data: booking } = await adminClient
         .from("bookings")
-        .select("booking_id, status")
+        .select("booking_id, booking_type")
         .eq("student_id", studentId)
         .eq("driver_id", driverId)
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "in_progress"])
         .maybeSingle();
 
       if (!booking) {
         return jsonResponse({ error: "No active booking for this student and driver" }, 403);
       }
 
-      const { data: active, error: subError } = await adminClient.rpc(
-        "is_subscription_active",
-        { booking_id: booking.booking_id }
-      );
+      // Subscription validity check only applies to monthly plans
+      if (booking.booking_type === "monthly") {
+        const { data: active, error: subError } = await adminClient.rpc(
+          "is_subscription_active",
+          { booking_id: booking.booking_id }
+        );
 
-      if (subError || !active) {
-        return jsonResponse({ error: "Subscription is not active" }, 403);
+        if (subError || !active) {
+          return jsonResponse({ error: "Subscription is not active" }, 403);
+        }
       }
 
       identity = `parent-${user.id}-${studentId}`;
