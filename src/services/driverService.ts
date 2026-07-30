@@ -256,6 +256,25 @@ export const updateDriver = async (id: string, data: UpdateDriverInput) => {
 };
 
 export const deleteDriver = async (id: string) => {
+  // Null out driver_id in student_attendance before deleting the driver.
+  // The student_attendance table has a FK (student_attendance_driver_id_fkey)
+  // referencing drivers. Without ON DELETE SET NULL on that constraint,
+  // deleting a driver with attendance records will throw a FK violation.
+  // This handles it at the app level as well (defence-in-depth alongside the migration).
+  const { error: attendanceError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .from("student_attendance" as any)
+    .update({ driver_id: null })
+    .eq("driver_id", id);
+
+  if (attendanceError) {
+    // Log but don't hard-fail – the migration may already handle this via ON DELETE SET NULL.
+    console.warn(
+      "Could not nullify driver_id in student_attendance (may be safe to ignore if migration applied):",
+      attendanceError
+    );
+  }
+
   const { error } = await supabase.from("drivers").delete().eq("driver_id", id);
 
   if (error) throw error;
