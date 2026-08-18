@@ -61,9 +61,11 @@ function RemoteDriverVideo() {
 function LiveStreamRoom({
   token,
   onDisconnect,
+  compact = false,
 }: {
   token: string;
   onDisconnect: () => void;
+  compact?: boolean;
 }) {
   if (!LIVEKIT_URL) {
     return (
@@ -83,11 +85,146 @@ function LiveStreamRoom({
       onDisconnected={onDisconnect}
       className="h-full"
     >
-      <div className="relative h-[min(70vh,480px)] w-full overflow-hidden rounded-lg bg-black">
+      <div
+        className={
+          compact
+            ? "relative aspect-video w-full overflow-hidden bg-black"
+            : "relative h-[min(70vh,480px)] w-full overflow-hidden rounded-lg bg-black"
+        }
+      >
         <RemoteDriverVideo />
       </div>
       <RoomAudioRenderer />
     </LiveKitRoom>
+  );
+}
+
+export interface LiveStreamTileProps {
+  driverId: number;
+  schoolId: number;
+  driverName: string;
+  cabNumber?: string;
+  tripType?: string | null;
+  autoConnect?: boolean;
+  connectDelayMs?: number;
+}
+
+/** Compact auto-connecting tile for multi-driver monitor grids. */
+export function LiveStreamTile({
+  driverId,
+  schoolId,
+  driverName,
+  cabNumber,
+  tripType,
+  autoConnect = true,
+  connectDelayMs = 0,
+}: LiveStreamTileProps) {
+  const { userRole, loading: authLoading } = useAuth();
+  const role = resolveLiveKitViewerRole(userRole);
+  const [token, setToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearRefresh = () => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+  };
+
+  const fetchToken = useCallback(async () => {
+    if (authLoading || !userRole) {
+      setError("Session still loading. Please try again.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await getAdminLiveKitToken(driverId, schoolId, role);
+      setToken(result.token);
+      clearRefresh();
+      refreshTimerRef.current = setTimeout(() => {
+        fetchToken();
+      }, TOKEN_REFRESH_MS);
+    } catch (err) {
+      setToken(null);
+      setError(err instanceof Error ? err.message : "Failed to connect");
+    } finally {
+      setLoading(false);
+    }
+  }, [authLoading, driverId, schoolId, role, userRole]);
+
+  const stopWatching = () => {
+    clearRefresh();
+    setToken(null);
+    setError(null);
+  };
+
+  useEffect(() => {
+    if (!autoConnect) return;
+    const timer = setTimeout(() => {
+      void fetchToken();
+    }, connectDelayMs);
+    return () => {
+      clearTimeout(timer);
+      clearRefresh();
+    };
+  }, [autoConnect, connectDelayMs, fetchToken]);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0 gap-2">
+        <div className="min-w-0">
+          <CardTitle className="text-sm truncate flex items-center gap-1.5">
+            <Radio className="h-3.5 w-3.5 shrink-0 text-red-500 animate-pulse" />
+            <span className="truncate">{driverName}</span>
+          </CardTitle>
+          <p className="text-xs text-muted-foreground truncate">
+            {cabNumber || "No cab"}
+            {tripType ? ` · ${tripType}` : ""}
+          </p>
+        </div>
+        {token ? (
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={stopWatching}>
+            Stop
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2"
+            onClick={() => void fetchToken()}
+            disabled={loading || authLoading || !userRole}
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Watch"}
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-0">
+        {error && !token ? (
+          <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-muted/40 px-3 text-center">
+            <VideoOff className="h-6 w-6 text-muted-foreground" />
+            <p className="text-xs text-destructive">{error}</p>
+            <Button variant="outline" size="sm" className="h-7" onClick={() => void fetchToken()}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+              Retry
+            </Button>
+          </div>
+        ) : loading && !token ? (
+          <div className="flex aspect-video items-center justify-center bg-black">
+            <Loader2 className="h-6 w-6 animate-spin text-white/80" />
+          </div>
+        ) : token ? (
+          <LiveStreamRoom token={token} onDisconnect={stopWatching} compact />
+        ) : (
+          <div className="flex aspect-video flex-col items-center justify-center gap-1 bg-muted/30 text-muted-foreground">
+            <Video className="h-6 w-6 opacity-60" />
+            <p className="text-xs">Click Watch to open the live feed</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

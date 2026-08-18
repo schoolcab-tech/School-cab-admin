@@ -27,9 +27,10 @@ export interface LeadBooking {
  * Get all contact form responses
  */
 export async function getContactFormResponses(): Promise<ContactFormResponse[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("website_contact_form_response")
     .select("*")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -40,9 +41,10 @@ export async function getContactFormResponses(): Promise<ContactFormResponse[]> 
  * Get all lead bookings
  */
 export async function getLeadBookings(): Promise<LeadBooking[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("website_lead_booking")
     .select("*")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -50,24 +52,24 @@ export async function getLeadBookings(): Promise<LeadBooking[]> {
 }
 
 /**
- * Delete a contact form response
+ * Soft-delete a contact form response
  */
 export async function deleteContactFormResponse(id: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("website_contact_form_response")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
 
   if (error) throw error;
 }
 
 /**
- * Delete a lead booking
+ * Soft-delete a lead booking
  */
 export async function deleteLeadBooking(id: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("website_lead_booking")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
 
   if (error) throw error;

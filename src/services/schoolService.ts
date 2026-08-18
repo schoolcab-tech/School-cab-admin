@@ -131,10 +131,11 @@ export const SCHOOLS_TABLE = "schools";
 
 export const getSchools = async (filters?: SchoolFilter) => {
   try {
-    // Select all columns including the school_id
-    let query = supabase
+    // Select all columns including the school_id — exclude soft-deleted schools
+    let query = (supabase as any)
       .from(SCHOOLS_TABLE)
-      .select("*", { count: "exact", head: false });
+      .select("*", { count: "exact", head: false })
+      .is("deleted_at", null);
 
     // Apply filters
     if (filters?.status) {
@@ -200,10 +201,11 @@ export const getSchools = async (filters?: SchoolFilter) => {
 
 export const getSchoolById = async (id: string) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from(SCHOOLS_TABLE)
       .select("*")
       .eq("school_id", id)
+      .is("deleted_at", null)
       .single();
 
     if (error) {
@@ -262,15 +264,16 @@ export const updateSchool = async (
 
 export const deleteSchool = async (school_id: string) => {
   try {
-    const { error } = await supabase
+    // Soft delete: stamp deleted_at instead of issuing a hard DELETE.
+    const { error } = await (supabase as any)
       .from(SCHOOLS_TABLE)
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq("school_id", school_id);
 
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error(`Error deleting school with id ${school_id}:`, error);
+    console.error(`Error soft-deleting school with id ${school_id}:`, error);
     throw error;
   }
 };

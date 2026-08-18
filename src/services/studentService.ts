@@ -281,7 +281,10 @@ export async function assignDriverToStudent(
 }
 
 /**
- * Delete a student and related transport records (bookings, payments, trips, etc.).
+ * Soft-delete a student and cancel their active transport records.
+ * Financial history (payments, subscription_payments, subscription_cycles)
+ * and booking records are preserved for audit purposes — only the student
+ * row itself is stamped with deleted_at and active bookings are cancelled.
  * Leaves the parent auth user intact (a parent may have other students).
  */
 export async function deleteStudent(
@@ -311,57 +314,41 @@ export async function deleteStudent(
 
   const bookingIds = (bookings || []).map((b) => b.booking_id);
 
+  // Cancel all confirmed bookings (preserves financial history)
   if (bookingIds.length > 0) {
-    const { error: subscriptionPaymentsError } = await supabase
-      .from("subscription_payments")
-      .delete()
-      .in("booking_id", bookingIds);
-    if (subscriptionPaymentsError) {
-      throw new Error(
-        `Error deleting subscription payments: ${subscriptionPaymentsError.message}`
-      );
-    }
-
-    const { error: paymentsError } = await supabase
-      .from("payments")
-      .delete()
-      .in("booking_id", bookingIds);
-    if (paymentsError) {
-      throw new Error(`Error deleting payments: ${paymentsError.message}`);
-    }
-
-    const { error: cyclesError } = await supabase
-      .from("subscription_cycles")
-      .delete()
-      .in("booking_id", bookingIds);
-    if (cyclesError) {
-      throw new Error(
-        `Error deleting subscription cycles: ${cyclesError.message}`
-      );
+    const { error: cancelBookingsError } = await supabase
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("student_id", studentId)
+      .eq("status", "confirmed");
+    if (cancelBookingsError) {
+      throw new Error(`Error cancelling bookings: ${cancelBookingsError.message}`);
     }
   }
 
   // Tables not always present in generated types — cast where needed
   const db = supabase as any;
 
+  // Deactivate trip assignments (soft delete — is_active = false)
   const { error: tripStudentsError } = await db
     .from("trip_students")
-    .delete()
+    .update({ is_active: false })
     .eq("student_id", studentId);
   if (tripStudentsError) {
-    throw new Error(`Error deleting trip students: ${tripStudentsError.message}`);
+    throw new Error(`Error deactivating trip students: ${tripStudentsError.message}`);
   }
 
   const { error: driverTripStudentsError } = await db
     .from("driver_trip_students")
-    .delete()
+    .update({ is_active: false })
     .eq("student_id", studentId);
   if (driverTripStudentsError) {
     throw new Error(
-      `Error deleting driver trip students: ${driverTripStudentsError.message}`
+      `Error deactivating driver trip students: ${driverTripStudentsError.message}`
     );
   }
 
+  // Hard-delete pending booking/unserviced requests (these are un-actioned leads, not history)
   const { error: bookingRequestsError } = await supabase
     .from("booking_requests")
     .delete()
@@ -382,23 +369,14 @@ export async function deleteStudent(
     );
   }
 
-  if (bookingIds.length > 0) {
-    const { error: deleteBookingsError } = await supabase
-      .from("bookings")
-      .delete()
-      .eq("student_id", studentId);
-    if (deleteBookingsError) {
-      throw new Error(`Error deleting bookings: ${deleteBookingsError.message}`);
-    }
-  }
-
-  const { error: deleteStudentError } = await supabase
+  // Soft-delete the student
+  const { error: deleteStudentError } = await db
     .from("students")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("student_id", studentId);
 
   if (deleteStudentError) {
-    throw new Error(`Error deleting student: ${deleteStudentError.message}`);
+    throw new Error(`Error soft-deleting student: ${deleteStudentError.message}`);
   }
 
   if (adminUserId && adminRole) {
@@ -478,7 +456,8 @@ export async function getStudents(options?: {
         )
       )
     `
-    );
+    )
+    .is("deleted_at" as any, null);
 
   if (options?.schoolId != null) {
     query = query.eq("school_id", options.schoolId);

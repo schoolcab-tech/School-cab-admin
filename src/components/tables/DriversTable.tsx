@@ -24,6 +24,8 @@ interface DriversTableProps {
   onAddDriver?: () => void;
   onViewDriver?: (id: string) => void;
   onEditDriver?: (id: string) => void;
+  schoolNames?: Record<string, string>;
+  selectedSchoolName?: string;
   filters?: {
     status?: "active" | "suspended";
     search?: string;
@@ -36,6 +38,8 @@ export function DriversTable({
   onAddDriver,
   onViewDriver,
   onEditDriver,
+  schoolNames = {},
+  selectedSchoolName,
   filters = {},
 }: DriversTableProps) {
   const navigate = useNavigate();
@@ -154,7 +158,14 @@ export function DriversTable({
       <CardHeader>
         <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between">
           <CardTitle className="text-2xl font-bold">
-            Drivers Directory
+            {selectedSchoolName
+              ? `Drivers — ${selectedSchoolName}`
+              : "Drivers Directory"}
+            {drivers.length > 0 && (
+              <span className="ml-2 text-base font-normal text-muted-foreground">
+                ({drivers.length})
+              </span>
+            )}
           </CardTitle>
           <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
             {/* <div className="relative flex-1 max-w-sm">
@@ -179,6 +190,7 @@ export function DriversTable({
             <TableRow>
               <TableHead className="min-w-[200px]">Driver Details</TableHead>
               <TableHead className="min-w-[150px]">Vehicle Info</TableHead>
+              <TableHead className="min-w-[160px]">Schools Serving</TableHead>
               <TableHead className="w-[120px]">Rating</TableHead>
               <TableHead className="w-[120px]">Service Areas</TableHead>
               <TableHead className="w-[100px]">Status</TableHead>
@@ -216,6 +228,35 @@ export function DriversTable({
                       Capacity: {driver.cab_capacity || 0}
                     </div>
                   </div>
+                </TableCell>
+                <TableCell>
+                  {driver.schools_serving && driver.schools_serving.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 max-w-[220px]">
+                      {driver.schools_serving.slice(0, 2).map((schoolId) => {
+                        const id = String(schoolId);
+                        return (
+                          <Badge
+                            key={id}
+                            variant={
+                              filters.schoolId && filters.schoolId === id
+                                ? "default"
+                                : "outline"
+                            }
+                            className="text-xs"
+                          >
+                            {schoolNames[id] || `School ${id}`}
+                          </Badge>
+                        );
+                      })}
+                      {driver.schools_serving.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{driver.schools_serving.length - 2}
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">None</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center">
@@ -329,7 +370,11 @@ export function DriversTable({
 
         {drivers.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            {searchTerm ? "No drivers match your search" : "No drivers found"}
+            {selectedSchoolName
+              ? `No drivers found for ${selectedSchoolName}`
+              : searchTerm
+                ? "No drivers match your search"
+                : "No drivers found"}
           </div>
         )}
       </CardContent>

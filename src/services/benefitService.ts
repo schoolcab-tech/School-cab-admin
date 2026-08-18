@@ -121,15 +121,16 @@ export const benefitService = {
     return data;
   },
 
-  // Delete benefit
+  // Soft-delete benefit by deactivating it (is_active = false).
+  // The row is preserved for historical/audit purposes.
   async deleteBenefit(id: string): Promise<void> {
     const { error } = await supabase
       .from('benefits')
-      .delete()
+      .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting benefit:', error);
+      console.error('Error soft-deleting benefit:', error);
       throw error;
     }
   },

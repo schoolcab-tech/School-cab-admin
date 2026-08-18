@@ -127,12 +127,14 @@ export async function updateDriverTrip(
 }
 
 /**
- * Delete a trip (CASCADE removes student assignments)
+ * Soft-delete a trip by marking it inactive (CASCADE hard-delete avoided).
+ * The trip row is preserved for audit history; setting is_active=false hides
+ * it from all active-trip queries which already filter by is_active=true.
  */
 export async function deleteDriverTrip(driverTripId: number): Promise<void> {
   const { error } = await supabase
     .from("driver_trips")
-    .delete()
+    .update({ is_active: false, updated_at: new Date().toISOString() })
     .eq("driver_trip_id", driverTripId);
 
   if (error) throw error;

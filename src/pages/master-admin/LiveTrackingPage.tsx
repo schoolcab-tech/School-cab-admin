@@ -12,8 +12,8 @@ export default function LiveTrackingPage() {
             Live Vehicle Tracking
           </h1>
           <p className="text-muted-foreground">
-            Use the drivers table for filters and trip details, or switch to the live map to see all
-            vehicles at once. Click a driver for full route tracking. Updates every 15 seconds.
+            Use the drivers table for filters, the live map for all vehicles, or Live monitor to
+            pick a school and watch every live driver on one screen. Updates every 15 seconds.
           </p>
         </div>
 

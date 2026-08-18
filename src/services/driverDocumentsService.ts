@@ -45,6 +45,7 @@ export async function listDriverDocuments(driverId: number): Promise<DriverDocum
     .from("driver_documents")
     .select("*")
     .eq("driver_id", driverId)
+    .is("deleted_at", null)
     .order("uploaded_at", { ascending: false });
   if (error) throw error;
   return data || [];
@@ -106,15 +107,14 @@ export async function uploadDriverDocument(
 }
 
 export async function deleteDriverDocument(doc: DriverDocument): Promise<void> {
-  // Delete the row first
+  // Soft delete: stamp deleted_at — the file is kept in storage so the record
+  // can be recovered if needed.  listDriverDocuments filters deleted_at IS NULL
+  // so the document will no longer appear in any list.
   const { error } = await db
     .from("driver_documents")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("document_id", doc.document_id);
   if (error) throw error;
-
-  // Best-effort file removal — if it fails, ignore (orphan file is harmless)
-  await db.storage.from(BUCKET).remove([doc.file_path]).catch(() => undefined);
 }
 
 /** Generate a signed URL for viewing/downloading. Expires in `expiresIn` seconds. */

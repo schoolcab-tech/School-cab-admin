@@ -80,11 +80,11 @@ export type DriverStats = {
 
 export const getDrivers = async (filters?: DriverFilter) => {
   try {
-    // Base select with joined service areas
-    let query = supabase.from("drivers").select(`
+    // Base select with joined service areas — exclude soft-deleted drivers
+    let query = (supabase.from("drivers") as any).select(`
       *,
       service_areas:driver_service_areas(pincode)
-    `);
+    `).is("deleted_at", null);
 
     // ----- Build driver id filter list based on pincode / school -----
     let driverIdsFilter: number[] | null = null;
@@ -144,7 +144,7 @@ export const getDrivers = async (filters?: DriverFilter) => {
 };
 
 export const getDriverById = async (id: string) => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("drivers")
     .select(
       `
@@ -162,6 +162,7 @@ export const getDriverById = async (id: string) => {
     `
     )
     .eq("driver_id", id)
+    .is("deleted_at", null)
     .eq("bookings.status", "confirmed")
     .eq("bookings.booking_type", "monthly")
     .single();
@@ -256,26 +257,25 @@ export const updateDriver = async (id: string, data: UpdateDriverInput) => {
 };
 
 export const deleteDriver = async (id: string) => {
-  // Null out driver_id in student_attendance before deleting the driver.
-  // The student_attendance table has a FK (student_attendance_driver_id_fkey)
-  // referencing drivers. Without ON DELETE SET NULL on that constraint,
-  // deleting a driver with attendance records will throw a FK violation.
-  // This handles it at the app level as well (defence-in-depth alongside the migration).
-  const { error: attendanceError } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from("student_attendance" as any)
+  // Soft delete: stamp deleted_at instead of issuing a hard DELETE.
+  // Also nullify driver_id in student_attendance so the FK
+  // (student_attendance_driver_id_fkey) doesn't block the update.
+  const { error: attendanceError } = await (supabase as any)
+    .from("student_attendance")
     .update({ driver_id: null })
     .eq("driver_id", id);
 
   if (attendanceError) {
-    // Log but don't hard-fail – the migration may already handle this via ON DELETE SET NULL.
     console.warn(
-      "Could not nullify driver_id in student_attendance (may be safe to ignore if migration applied):",
+      "Could not nullify driver_id in student_attendance (safe to ignore if migration applied):",
       attendanceError
     );
   }
 
-  const { error } = await supabase.from("drivers").delete().eq("driver_id", id);
+  const { error } = await (supabase as any)
+    .from("drivers")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("driver_id", id);
 
   if (error) throw error;
 };
@@ -470,10 +470,14 @@ export const getDriversByPincode = async (pincode: string) => {
 };
 
 export const getDriversBySchool = async (schoolId: string) => {
+  const numericId = parseInt(schoolId, 10);
+  if (isNaN(numericId) || numericId <= 0) return [];
+
   const { data, error } = await supabase
     .from("drivers")
     .select("driver_id")
-    .contains("schools_serving", [schoolId]);
+    .contains("schools_serving", [numericId])
+    .is("deleted_at", null);
 
   if (error) throw error;
   return data?.map((item) => item.driver_id) || [];

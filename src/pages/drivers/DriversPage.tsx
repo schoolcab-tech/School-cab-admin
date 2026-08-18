@@ -3,13 +3,38 @@ import { DriversTable } from "@/components/tables/DriversTable";
 import { ExportButton } from "@/components/ExportButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { useDrivers } from "@/hooks/useDrivers";
 import { supabase } from "@/integrations/supabase/client";
-import { Filter, Plus, Search, Upload, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  Check,
+  CheckCircle2,
+  ChevronsUpDown,
+  Filter,
+  GraduationCap,
+  Plus,
+  Search,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function DriversPage() {
   return (
@@ -21,6 +46,7 @@ export default function DriversPage() {
 
 function DriversContent() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<{
     status: "" | "active" | "suspended";
@@ -29,11 +55,10 @@ function DriversContent() {
   }>({
     status: "",
     pincode: "",
-    schoolId: "",
+    schoolId: searchParams.get("schoolId") || "",
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedPincode, setSelectedPincode] = useState<string>("");
-  const [selectedSchool, setSelectedSchool] = useState<string>("");
+  const [schoolPickerOpen, setSchoolPickerOpen] = useState(false);
   const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
   const [pincodes, setPincodes] = useState<string[]>([]);
 
@@ -82,12 +107,14 @@ function DriversContent() {
     navigate(`/drivers/${id}/edit`);
   };
 
-  const handleClearFilters = () => {
-    setFilters({
-      status: "",
-      pincode: "",
-      schoolId: "",
-    });
+  const setSchoolId = (schoolId: string) => {
+    setFilters((prev) => ({ ...prev, schoolId }));
+    if (schoolId) {
+      searchParams.set("schoolId", schoolId);
+    } else {
+      searchParams.delete("schoolId");
+    }
+    setSearchParams(searchParams, { replace: true });
   };
 
   const { data: exportDrivers = [] } = useDrivers({
@@ -95,13 +122,30 @@ function DriversContent() {
     search: searchTerm || undefined,
   });
 
+  const selectedSchool = schools.find((s) => s.id === filters.schoolId);
+  const schoolNameMap = useMemo(
+    () => Object.fromEntries(schools.map((s) => [s.id, s.name])),
+    [schools]
+  );
+  const schoolDriverStats = useMemo(() => {
+    if (!filters.schoolId) return null;
+    const verified = exportDrivers.filter((d) => d.is_verified).length;
+    return {
+      total: exportDrivers.length,
+      verified,
+      unverified: exportDrivers.length - verified,
+    };
+  }, [filters.schoolId, exportDrivers]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Drivers</h1>
           <p className="text-muted-foreground">
-            Manage your drivers and their details
+            {selectedSchool
+              ? `Drivers serving ${selectedSchool.name}`
+              : "Manage your drivers and their details. Filter by school to see all drivers for that school."}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -171,6 +215,120 @@ function DriversContent() {
         </div>
       </div> */}
 
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="text-sm font-medium flex items-center gap-2 shrink-0">
+              <GraduationCap className="h-4 w-4" />
+              School
+            </label>
+            <Popover open={schoolPickerOpen} onOpenChange={setSchoolPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={schoolPickerOpen}
+                  className="w-full sm:max-w-md justify-between font-normal"
+                >
+                  <span className="truncate">
+                    {selectedSchool ? selectedSchool.name : "All schools"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search schools..." />
+                  <CommandList>
+                    <CommandEmpty>No school found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all-schools"
+                        onSelect={() => {
+                          setSchoolId("");
+                          setSchoolPickerOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            !filters.schoolId ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        All schools
+                      </CommandItem>
+                      {schools.map((s) => (
+                        <CommandItem
+                          key={s.id}
+                          value={`${s.name} ${s.id}`}
+                          onSelect={() => {
+                            setSchoolId(s.id);
+                            setSchoolPickerOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              filters.schoolId === s.id
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {s.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {filters.schoolId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSchoolId("")}
+                className="shrink-0"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear school
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {schoolDriverStats && selectedSchool && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium">Drivers at this school</h3>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{schoolDriverStats.total}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium">Verified</h3>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{schoolDriverStats.verified}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium">Unverified</h3>
+              <X className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{schoolDriverStats.unverified}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Tabs defaultValue="all" className="space-y-4">
         <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <TabsList>
@@ -195,9 +353,9 @@ function DriversContent() {
             >
               <Filter className="h-4 w-4 mr-2" />
               Filters
-              {Object.values(filters).some(Boolean) && (
+              {[filters.status, filters.pincode].filter(Boolean).length > 0 && (
                 <span className="ml-2 h-5 w-5 rounded-full bg-primary text-white text-xs flex items-center justify-center">
-                  {Object.values(filters).filter(Boolean).length}
+                  {[filters.status, filters.pincode].filter(Boolean).length}
                 </span>
               )}
             </Button>
@@ -210,11 +368,17 @@ function DriversContent() {
               <div className="flex items-center justify-between">
                 <h3 className="font-medium">Filters</h3>
                 <div className="flex items-center space-x-2">
-                  {(filters.status || filters.pincode || filters.schoolId) && (
+                  {(filters.status || filters.pincode) && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleClearFilters}
+                      onClick={() =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          status: "",
+                          pincode: "",
+                        }))
+                      }
                       className="text-sm"
                     >
                       <X className="h-4 w-4 mr-1" />
@@ -225,7 +389,7 @@ function DriversContent() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Status
@@ -264,25 +428,6 @@ function DriversContent() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    School
-                  </label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={filters.schoolId}
-                    onChange={(e) =>
-                      setFilters({ ...filters, schoolId: e.target.value })
-                    }
-                  >
-                    <option value="">All Schools</option>
-                    {schools.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -293,6 +438,8 @@ function DriversContent() {
             onAddDriver={handleAddDriver}
             onViewDriver={handleViewDriver}
             onEditDriver={handleEditDriver}
+            schoolNames={schoolNameMap}
+            selectedSchoolName={selectedSchool?.name}
             filters={{
               ...(filters.status
                 ? { status: filters.status as "active" | "suspended" }
@@ -308,6 +455,8 @@ function DriversContent() {
             onAddDriver={handleAddDriver}
             onViewDriver={handleViewDriver}
             onEditDriver={handleEditDriver}
+            schoolNames={schoolNameMap}
+            selectedSchoolName={selectedSchool?.name}
             filters={{
               ...(filters.pincode ? { pincode: filters.pincode } : {}),
               ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
@@ -321,6 +470,8 @@ function DriversContent() {
             onAddDriver={handleAddDriver}
             onViewDriver={handleViewDriver}
             onEditDriver={handleEditDriver}
+            schoolNames={schoolNameMap}
+            selectedSchoolName={selectedSchool?.name}
             filters={{
               ...(filters.pincode ? { pincode: filters.pincode } : {}),
               ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
