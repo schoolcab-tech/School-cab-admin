@@ -6,8 +6,11 @@ import "leaflet/dist/leaflet.css";
 import { useSimpleQuery } from "@/hooks/useSimpleQuery";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getDriverOperationsOverview,
-  type DriverOperationRow,
+  getActiveTripsForTracking,
+  getLiveDriverLocations,
+  indexTripsByDriver,
+  isGpsLive,
+  type DriverLiveLocation,
 } from "@/services/liveTrackingService";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,9 +37,13 @@ type SchoolOption = {
   longitude: number | null;
 };
 
+type MonitorDriver = DriverLiveLocation & {
+  trip_type: string | null;
+};
+
 type SchoolDriverGroup = {
   school: SchoolOption;
-  drivers: DriverOperationRow[];
+  drivers: MonitorDriver[];
 };
 
 export interface SchoolLiveMonitorViewProps {
@@ -73,10 +80,9 @@ function makeLiveIcon(onTrip: boolean) {
   });
 }
 
-function sortLiveDrivers(drivers: DriverOperationRow[]) {
+function sortLiveDrivers(drivers: MonitorDriver[]) {
   return [...drivers].sort((a, b) => {
-    const score = (r: DriverOperationRow) =>
-      r.phase === "on_trip" ? 2 : r.is_live ? 1 : 0;
+    const score = (r: MonitorDriver) => (r.status === "on_trip" ? 2 : 1);
     return score(b) - score(a);
   });
 }
@@ -154,14 +160,21 @@ export function SchoolLiveMonitorView({
             latitude: null,
             longitude: null,
           };
-          const rows = await getDriverOperationsOverview({
-            schoolId,
-            driverIds,
-          });
+          const [locations, trips] = await Promise.all([
+            getLiveDriverLocations({ schoolId }),
+            getActiveTripsForTracking({ schoolId }),
+          ]);
+          const tripsByDriver = indexTripsByDriver(trips);
           return {
             school,
             drivers: sortLiveDrivers(
-              rows.filter((r) => r.is_live || r.phase === "on_trip")
+              locations
+                .filter((d) => isGpsLive(d))
+                .filter((d) => !driverIds?.length || driverIds.includes(d.driver_id))
+                .map((d) => ({
+                  ...d,
+                  trip_type: tripsByDriver.get(d.driver_id)?.trip_type ?? null,
+                }))
             ),
           };
         })
@@ -173,7 +186,7 @@ export function SchoolLiveMonitorView({
 
   const liveDrivers = useMemo(() => {
     const seen = new Set<number>();
-    const unique: DriverOperationRow[] = [];
+    const unique: MonitorDriver[] = [];
     for (const driver of groups.flatMap((g) => g.drivers)) {
       if (seen.has(driver.driver_id)) continue;
       seen.add(driver.driver_id);
@@ -181,7 +194,7 @@ export function SchoolLiveMonitorView({
     }
     return unique;
   }, [groups]);
-  const onTripCount = liveDrivers.filter((d) => d.phase === "on_trip").length;
+  const onTripCount = liveDrivers.filter((d) => d.status === "on_trip").length;
   const cameraCount = groups.reduce(
     (sum, g) =>
       g.school.livestreamEnabled ? sum + g.drivers.length : sum,
@@ -301,7 +314,7 @@ export function SchoolLiveMonitorView({
                   : `${selectedSchools.length} schools — live monitor`}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Live drivers grouped by school. Streams update while this tab is open.
+                Live drivers grouped by school. Only GPS-live drivers are shown.
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => void refetch()}>
@@ -362,15 +375,13 @@ export function SchoolLiveMonitorView({
                         <Marker
                           key={d.driver_id}
                           position={[d.latitude, d.longitude]}
-                          icon={makeLiveIcon(d.phase === "on_trip")}
+                          icon={makeLiveIcon(d.status === "on_trip")}
                         >
                           <Popup>
                             <div className="text-sm">
                               <p className="font-medium">{d.driver_name}</p>
                               <p className="text-muted-foreground">{d.cab_number}</p>
-                              {d.school_name && (
-                                <p className="text-xs mt-1">{d.school_name}</p>
-                              )}
+                              <p className="text-xs mt-1 capitalize">{d.status}</p>
                               <Link
                                 to={`${detailPathPrefix}/${d.driver_id}`}
                                 className="text-primary underline text-xs"
@@ -457,7 +468,7 @@ function GpsOnlyTile({
   driver,
   detailPathPrefix,
 }: {
-  driver: DriverOperationRow;
+  driver: MonitorDriver;
   detailPathPrefix: string;
 }) {
   return (
@@ -469,8 +480,8 @@ function GpsOnlyTile({
       <CardContent className="pt-0">
         <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-md bg-muted/40 text-center">
           <VideoOff className="h-6 w-6 text-muted-foreground" />
-          <Badge variant={driver.phase === "on_trip" ? "default" : "secondary"}>
-            {driver.phase === "on_trip" ? "On trip" : "Live GPS"}
+          <Badge variant={driver.status === "on_trip" ? "default" : "secondary"}>
+            {driver.status === "on_trip" ? "On trip" : "Live GPS"}
           </Badge>
           <p className="text-xs text-muted-foreground px-3">
             Camera streaming is off for this school.

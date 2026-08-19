@@ -59,14 +59,43 @@ export type TripStop = {
 
 const INACTIVITY_THRESHOLD_MIN = 5;
 
-const computeLive = (lastSeenAt: string, status: string, isTrackingEnabled: boolean) => {
+const computeLive = (lastSeenAt: string | null, status: string, isTrackingEnabled: boolean) => {
+  if (!lastSeenAt) {
+    return { minutesSince: Number.POSITIVE_INFINITY, isLive: false };
+  }
   const minutesSince = (Date.now() - new Date(lastSeenAt).getTime()) / 60000;
   const isLive =
     isTrackingEnabled &&
+    Number.isFinite(minutesSince) &&
+    minutesSince >= 0 &&
     minutesSince <= INACTIVITY_THRESHOLD_MIN &&
     (status === "online" || status === "on_trip");
   return { minutesSince, isLive };
 };
+
+export function isGpsLive(driver: {
+  is_live?: boolean;
+  last_seen_at?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  status?: string | null;
+  minutes_since_last_seen?: number | null;
+}): boolean {
+  if (driver.latitude == null || driver.longitude == null) return false;
+  if (!driver.last_seen_at) return false;
+  const status = driver.status || "";
+  if (status !== "online" && status !== "on_trip") return false;
+  const minutesSince =
+    driver.minutes_since_last_seen != null
+      ? driver.minutes_since_last_seen
+      : (Date.now() - new Date(driver.last_seen_at).getTime()) / 60000;
+  return (
+    driver.is_live === true &&
+    Number.isFinite(minutesSince) &&
+    minutesSince >= 0 &&
+    minutesSince <= INACTIVITY_THRESHOLD_MIN
+  );
+}
 
 export function formatCoordinates(lat: number, lng: number, precision = 6): string {
   return `${lat.toFixed(precision)}, ${lng.toFixed(precision)}`;
@@ -99,7 +128,7 @@ export async function getLiveDriverLocations(opts?: {
   const all: DriverLiveLocation[] = (data || [])
     .filter((row: any) => row.drivers)
     .map((row: any) => {
-      const lastSeen = row.last_seen_at || row.updated_at || new Date().toISOString();
+      const lastSeen = row.last_seen_at || null;
       const { minutesSince, isLive } = computeLive(
         lastSeen,
         row.status || "",
@@ -119,7 +148,7 @@ export async function getLiveDriverLocations(opts?: {
         battery_level: row.battery_level != null ? Number(row.battery_level) : null,
         heading: row.heading != null ? Number(row.heading) : null,
         speed: row.speed != null ? Number(row.speed) : null,
-        last_seen_at: lastSeen,
+        last_seen_at: lastSeen || "",
         is_tracking_enabled: row.is_tracking_enabled !== false,
         eta_minutes: row.eta_minutes != null ? Number(row.eta_minutes) : null,
         eta_distance_km: row.eta_distance_km != null ? Number(row.eta_distance_km) : null,
@@ -133,8 +162,10 @@ export async function getLiveDriverLocations(opts?: {
     });
 
   if (opts?.schoolId != null) {
-    const id = opts.schoolId;
-    return all.filter((d) => d.schools_serving.includes(id));
+    const id = Number(opts.schoolId);
+    return all.filter((d) =>
+      (d.schools_serving || []).some((schoolId) => Number(schoolId) === id)
+    );
   }
   return all;
 }
