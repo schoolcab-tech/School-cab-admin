@@ -496,6 +496,7 @@ export type DriverOperationRow = {
   trip_started_at: string | null;
   school_id: number | null;
   school_name: string | null;
+  schools_serving: number[];
   livestream_enabled: boolean;
   picked_up_count: number;
   dropped_count: number;
@@ -530,6 +531,7 @@ function buildDriverOperationRow(
     cab_capacity: number;
     is_verified: boolean;
     is_live: boolean;
+    schools_serving?: number[];
     latitude: number | null;
     longitude: number | null;
     status: string | null;
@@ -595,6 +597,7 @@ function buildDriverOperationRow(
     trip_started_at: trip?.actual_start_time ?? null,
     school_id: trip?.school_id ?? null,
     school_name: trip?.school_name ?? null,
+    schools_serving: v.schools_serving || [],
     livestream_enabled: livestreamEnabled,
     picked_up_count: picked,
     dropped_count: dropped,

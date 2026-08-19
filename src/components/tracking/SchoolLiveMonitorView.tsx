@@ -12,24 +12,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { LiveStreamTile } from "./LiveStreamViewer";
 import {
-  Check,
-  ChevronsUpDown,
   GraduationCap,
   Loader2,
   MapPin,
@@ -47,6 +32,11 @@ type SchoolOption = {
   livestreamEnabled: boolean;
   latitude: number | null;
   longitude: number | null;
+};
+
+type SchoolDriverGroup = {
+  school: SchoolOption;
+  drivers: DriverOperationRow[];
 };
 
 export interface SchoolLiveMonitorViewProps {
@@ -83,190 +73,217 @@ function makeLiveIcon(onTrip: boolean) {
   });
 }
 
+function sortLiveDrivers(drivers: DriverOperationRow[]) {
+  return [...drivers].sort((a, b) => {
+    const score = (r: DriverOperationRow) =>
+      r.phase === "on_trip" ? 2 : r.is_live ? 1 : 0;
+    return score(b) - score(a);
+  });
+}
+
 export function SchoolLiveMonitorView({
   schoolId: schoolIdProp,
   driverIds,
   detailPathPrefix,
   refetchInterval = 15000,
 }: SchoolLiveMonitorViewProps) {
-  const [pickedSchoolId, setPickedSchoolId] = useState<string>(
-    schoolIdProp != null ? String(schoolIdProp) : ""
+  const [pickedSchoolIds, setPickedSchoolIds] = useState<string[]>(
+    schoolIdProp != null ? [String(schoolIdProp)] : []
   );
-  const [schoolPickerOpen, setSchoolPickerOpen] = useState(false);
 
-  const { data: schools = [], isLoading: schoolsLoading, error: schoolsError } = useSimpleQuery<SchoolOption[]>(async () => {
-    const { data, error } = await supabase
-      .from("schools")
-      .select("school_id, name, latitude, longitude")
-      .order("name");
-    if (error) throw error;
+  const { data: schools = [], isLoading: schoolsLoading, error: schoolsError } =
+    useSimpleQuery<SchoolOption[]>(async () => {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("school_id, name, latitude, longitude")
+        .order("name");
+      if (error) throw error;
 
-    let livestreamBySchool = new Map<number, boolean>();
-    const { data: livestreamRows, error: livestreamError } = await (supabase as any)
-      .from("schools")
-      .select("school_id, livestream_enabled");
-    if (!livestreamError && livestreamRows) {
-      livestreamBySchool = new Map(
-        (livestreamRows as Array<{ school_id: number; livestream_enabled?: boolean }>).map(
-          (s) => [Number(s.school_id), !!s.livestream_enabled]
-        )
-      );
-    }
+      let livestreamBySchool = new Map<number, boolean>();
+      const { data: livestreamRows, error: livestreamError } = await (supabase as any)
+        .from("schools")
+        .select("school_id, livestream_enabled");
+      if (!livestreamError && livestreamRows) {
+        livestreamBySchool = new Map(
+          (
+            livestreamRows as Array<{ school_id: number; livestream_enabled?: boolean }>
+          ).map((s) => [Number(s.school_id), !!s.livestream_enabled])
+        );
+      }
 
-    return (data || []).map((s) => {
-      const id = Number(s.school_id);
-      return {
-        id,
-        name: s.name,
-        livestreamEnabled: livestreamBySchool.get(id) ?? true,
-        latitude: s.latitude != null ? Number(s.latitude) : null,
-        longitude: s.longitude != null ? Number(s.longitude) : null,
-      };
-    });
-  }, []);
+      return (data || []).map((s) => {
+        const id = Number(s.school_id);
+        return {
+          id,
+          name: s.name,
+          livestreamEnabled: livestreamBySchool.get(id) ?? true,
+          latitude: s.latitude != null ? Number(s.latitude) : null,
+          longitude: s.longitude != null ? Number(s.longitude) : null,
+        };
+      });
+    }, []);
 
-  const effectiveSchoolId = schoolIdProp ?? (pickedSchoolId ? Number(pickedSchoolId) : undefined);
-  const selectedSchool = schools.find((s) => s.id === effectiveSchoolId);
+  const selectedIds = useMemo(
+    () =>
+      schoolIdProp != null
+        ? [schoolIdProp]
+        : pickedSchoolIds.map((id) => Number(id)).filter((id) => !isNaN(id)),
+    [schoolIdProp, pickedSchoolIds]
+  );
+  const selectedSchools = useMemo(
+    () => schools.filter((s) => selectedIds.includes(s.id)),
+    [schools, selectedIds]
+  );
   const showSchoolPicker = schoolIdProp == null;
+  const hasSelection = selectedIds.length > 0;
 
   const {
-    data: rows = [],
+    data: groups = [],
     isLoading,
     error,
     refetch,
-  } = useSimpleQuery<DriverOperationRow[]>(
-    () =>
-      getDriverOperationsOverview({
-        schoolId: effectiveSchoolId,
-        driverIds,
-      }),
-    [effectiveSchoolId, driverIds?.join(",")],
-    { enabled: !!effectiveSchoolId, refetchInterval }
+  } = useSimpleQuery<SchoolDriverGroup[]>(
+    async () => {
+      const schoolMap = new Map(schools.map((s) => [s.id, s]));
+      return Promise.all(
+        selectedIds.map(async (schoolId) => {
+          const school = schoolMap.get(schoolId) ?? {
+            id: schoolId,
+            name: `School ${schoolId}`,
+            livestreamEnabled: true,
+            latitude: null,
+            longitude: null,
+          };
+          const rows = await getDriverOperationsOverview({
+            schoolId,
+            driverIds,
+          });
+          return {
+            school,
+            drivers: sortLiveDrivers(
+              rows.filter((r) => r.is_live || r.phase === "on_trip")
+            ),
+          };
+        })
+      );
+    },
+    [selectedIds.join(","), driverIds?.join(","), schools.map((s) => s.id).join(",")],
+    { enabled: hasSelection, refetchInterval }
   );
 
   const liveDrivers = useMemo(() => {
-    return rows
-      .filter((r) => r.is_live || r.phase === "on_trip")
-      .sort((a, b) => {
-        const score = (r: DriverOperationRow) =>
-          r.phase === "on_trip" ? 2 : r.is_live ? 1 : 0;
-        return score(b) - score(a);
-      });
-  }, [rows]);
-
-  const streamingDrivers = useMemo(() => {
-    if (selectedSchool && !selectedSchool.livestreamEnabled) return [];
-    return liveDrivers;
-  }, [liveDrivers, selectedSchool]);
+    const seen = new Set<number>();
+    const unique: DriverOperationRow[] = [];
+    for (const driver of groups.flatMap((g) => g.drivers)) {
+      if (seen.has(driver.driver_id)) continue;
+      seen.add(driver.driver_id);
+      unique.push(driver);
+    }
+    return unique;
+  }, [groups]);
+  const onTripCount = liveDrivers.filter((d) => d.phase === "on_trip").length;
+  const cameraCount = groups.reduce(
+    (sum, g) =>
+      g.school.livestreamEnabled ? sum + g.drivers.length : sum,
+    0
+  );
 
   const mapPoints = useMemo<[number, number][]>(() => {
     const pts: [number, number][] = liveDrivers
       .filter((d) => d.latitude != null && d.longitude != null)
       .map((d) => [d.latitude as number, d.longitude as number]);
-    if (selectedSchool?.latitude != null && selectedSchool?.longitude != null) {
-      pts.push([selectedSchool.latitude, selectedSchool.longitude]);
+    for (const s of selectedSchools) {
+      if (s.latitude != null && s.longitude != null) {
+        pts.push([s.latitude, s.longitude]);
+      }
     }
     return pts;
-  }, [liveDrivers, selectedSchool]);
+  }, [liveDrivers, selectedSchools]);
 
   const mapCenter: [number, number] =
-    selectedSchool?.latitude != null && selectedSchool?.longitude != null
-      ? [selectedSchool.latitude, selectedSchool.longitude]
+    selectedSchools.find((s) => s.latitude != null && s.longitude != null)
+      ? [
+          selectedSchools.find((s) => s.latitude != null)!.latitude as number,
+          selectedSchools.find((s) => s.longitude != null)!.longitude as number,
+        ]
       : mapPoints[0] || [28.4595, 77.0266];
 
-  const onTripCount = liveDrivers.filter((d) => d.phase === "on_trip").length;
+  let autoStreamIndex = 0;
 
   return (
     <div className="space-y-4">
       {showSchoolPicker && (
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <label className="text-sm font-medium flex items-center gap-2 shrink-0">
+          <CardContent className="pt-6 space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <label className="text-sm font-medium flex items-center gap-2 shrink-0 sm:pt-2">
                 <GraduationCap className="h-4 w-4" />
-                School to monitor
+                Schools to monitor
               </label>
-              <Popover open={schoolPickerOpen} onOpenChange={setSchoolPickerOpen}>
-                <PopoverTrigger asChild>
+              <div className="flex-1 space-y-2">
+                <MultiSelect
+                  options={schools.map((s) => ({
+                    label: s.name,
+                    value: String(s.id),
+                  }))}
+                  selected={pickedSchoolIds}
+                  onChange={setPickedSchoolIds}
+                  placeholder={
+                    schoolsLoading ? "Loading schools..." : "Select one or more schools"
+                  }
+                  searchPlaceholder="Search schools..."
+                  emptyText={
+                    schoolsError ? schoolsError.message : "No school found."
+                  }
+                  className="sm:max-w-xl"
+                />
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    role="combobox"
-                    aria-expanded={schoolPickerOpen}
-                    className="w-full sm:max-w-md justify-between font-normal"
+                    size="sm"
+                    disabled={schools.length === 0}
+                    onClick={() =>
+                      setPickedSchoolIds(schools.map((s) => String(s.id)))
+                    }
                   >
-                    <span className="truncate">
-                      {schoolsLoading
-                        ? "Loading schools..."
-                        : selectedSchool
-                          ? selectedSchool.name
-                          : "Select a school"}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    Select all
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] p-0"
-                  align="start"
-                >
-                  <Command>
-                    <CommandInput placeholder="Search schools..." />
-                    <CommandList>
-                      <CommandEmpty>
-                        {schoolsLoading
-                          ? "Loading schools..."
-                          : schoolsError
-                            ? schoolsError.message
-                            : "No school found."}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {schools.map((s) => (
-                          <CommandItem
-                            key={s.id}
-                            value={`${s.name} ${s.id}`}
-                            onSelect={() => {
-                              setPickedSchoolId(String(s.id));
-                              setSchoolPickerOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                effectiveSchoolId === s.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {s.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                  {pickedSchoolIds.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPickedSchoolIds([])}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {!effectiveSchoolId && (
+      {!hasSelection && (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
             <GraduationCap className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p className="font-medium text-foreground">Select a school</p>
+            <p className="font-medium text-foreground">Select schools</p>
             <p className="text-sm mt-1">
-              Choose a school to monitor all live drivers on one screen.
+              Choose one or more schools to monitor live drivers, grouped by school.
             </p>
           </CardContent>
         </Card>
       )}
 
-      {effectiveSchoolId && isLoading && liveDrivers.length === 0 && (
+      {hasSelection && isLoading && liveDrivers.length === 0 && (
         <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
           <Loader2 className="h-6 w-6 animate-spin" />
           Loading live drivers…
         </div>
       )}
 
-      {effectiveSchoolId && error && (
+      {hasSelection && error && (
         <Card>
           <CardContent className="py-8 text-center text-destructive">
             {error.message}
@@ -274,15 +291,17 @@ export function SchoolLiveMonitorView({
         </Card>
       )}
 
-      {effectiveSchoolId && !error && (
+      {hasSelection && !error && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">
-                {selectedSchool?.name ?? "School"} — live monitor
+                {selectedSchools.length === 1
+                  ? `${selectedSchools[0].name} — live monitor`
+                  : `${selectedSchools.length} schools — live monitor`}
               </h2>
               <p className="text-sm text-muted-foreground">
-                All live and on-trip drivers for this school on one screen.
+                Live drivers grouped by school. Streams update while this tab is open.
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => void refetch()}>
@@ -308,7 +327,7 @@ export function SchoolLiveMonitorView({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Camera feeds</CardTitle>
               </CardHeader>
-              <CardContent className="text-2xl font-bold">{streamingDrivers.length}</CardContent>
+              <CardContent className="text-2xl font-bold">{cameraCount}</CardContent>
             </Card>
           </div>
 
@@ -322,12 +341,12 @@ export function SchoolLiveMonitorView({
             <CardContent>
               {mapPoints.length === 0 ? (
                 <div className="h-56 flex items-center justify-center text-sm text-muted-foreground rounded-lg border border-dashed">
-                  No live GPS positions for this school right now.
+                  No live GPS positions for the selected schools right now.
                 </div>
               ) : (
                 <div className="h-72 overflow-hidden rounded-lg">
                   <MapContainer
-                    key={effectiveSchoolId}
+                    key={selectedIds.join("-")}
                     center={mapCenter}
                     zoom={13}
                     className="h-full w-full"
@@ -349,6 +368,9 @@ export function SchoolLiveMonitorView({
                             <div className="text-sm">
                               <p className="font-medium">{d.driver_name}</p>
                               <p className="text-muted-foreground">{d.cab_number}</p>
+                              {d.school_name && (
+                                <p className="text-xs mt-1">{d.school_name}</p>
+                              )}
                               <Link
                                 to={`${detailPathPrefix}/${d.driver_id}`}
                                 className="text-primary underline text-xs"
@@ -366,54 +388,64 @@ export function SchoolLiveMonitorView({
             </CardContent>
           </Card>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Radio className="h-4 w-4 text-red-500" />
-                Live camera feeds
-              </h3>
-              {selectedSchool && !selectedSchool.livestreamEnabled && (
-                <Badge variant="secondary">Streaming disabled for this school</Badge>
-              )}
-            </div>
+          <div className="space-y-8">
+            {groups.map((group) => {
+              const startIndex = autoStreamIndex;
+              if (group.school.livestreamEnabled) {
+                autoStreamIndex += group.drivers.length;
+              }
 
-            {liveDrivers.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No live drivers for this school right now.
-                </CardContent>
-              </Card>
-            ) : schoolsLoading && !selectedSchool ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Checking stream settings…
-              </div>
-            ) : selectedSchool && !selectedSchool.livestreamEnabled ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {liveDrivers.map((d) => (
-                  <GpsOnlyTile
-                    key={d.driver_id}
-                    driver={d}
-                    detailPathPrefix={detailPathPrefix}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {streamingDrivers.map((d, index) => (
-                  <LiveStreamTile
-                    key={d.driver_id}
-                    driverId={d.driver_id}
-                    schoolId={d.school_id ?? effectiveSchoolId}
-                    driverName={d.driver_name}
-                    cabNumber={d.cab_number}
-                    tripType={d.trip_type}
-                    autoConnect={index < MAX_AUTO_STREAMS}
-                    connectDelayMs={index * 250}
-                  />
-                ))}
-              </div>
-            )}
+              return (
+                <section key={group.school.id} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Radio className="h-4 w-4 text-red-500" />
+                      {group.school.name}
+                      <Badge variant="secondary">{group.drivers.length} live</Badge>
+                    </h3>
+                    {!group.school.livestreamEnabled && (
+                      <Badge variant="secondary">Streaming disabled</Badge>
+                    )}
+                  </div>
+
+                  {group.drivers.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                        No live drivers for this school right now.
+                      </CardContent>
+                    </Card>
+                  ) : !group.school.livestreamEnabled ? (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {group.drivers.map((d) => (
+                        <GpsOnlyTile
+                          key={d.driver_id}
+                          driver={d}
+                          detailPathPrefix={detailPathPrefix}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {group.drivers.map((d, index) => {
+                        const globalIndex = startIndex + index;
+                        return (
+                          <LiveStreamTile
+                            key={d.driver_id}
+                            driverId={d.driver_id}
+                            schoolId={group.school.id}
+                            driverName={d.driver_name}
+                            cabNumber={d.cab_number}
+                            tripType={d.trip_type}
+                            autoConnect={globalIndex < MAX_AUTO_STREAMS}
+                            connectDelayMs={globalIndex * 250}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
         </>
       )}
