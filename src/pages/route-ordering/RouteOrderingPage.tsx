@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useDriverSchoolRoutes } from "@/hooks/useRouteOrdering";
@@ -368,13 +369,15 @@ export default function RouteOrderingPage() {
 }
 
 export function SchoolAdminRouteOrderingPage() {
-  const { linkedSchoolId } = useAuth();
+  const { isModerator } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
+  const basePath = isModerator ? "/moderator/route-ordering" : "/school-admin/route-ordering";
   return (
     <DashboardLayout>
-      {linkedSchoolId ? (
+      {activeSchoolId ? (
         <RouteOrderingContent
-          schoolId={linkedSchoolId}
-          basePath="/school-admin/route-ordering"
+          schoolId={activeSchoolId}
+          basePath={basePath}
         />
       ) : (
         <div className="text-center py-12 text-muted-foreground">

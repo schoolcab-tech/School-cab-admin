@@ -2,7 +2,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import {
   useDriverSchoolStudents,
   useOptimizeDropOrder,
@@ -523,12 +524,14 @@ export default function RouteOrderingDetailPage() {
 }
 
 export function SchoolAdminRouteOrderingDetailPage() {
-  const { linkedSchoolId } = useAuth();
+  const { isModerator } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
+  const listPath = isModerator ? "/moderator/route-ordering" : "/school-admin/route-ordering";
   return (
     <DashboardLayout>
       <RouteOrderingDetailContent
-        listPath="/school-admin/route-ordering"
-        linkedSchoolId={linkedSchoolId ?? undefined}
+        listPath={listPath}
+        linkedSchoolId={activeSchoolId ?? undefined}
       />
     </DashboardLayout>
   );

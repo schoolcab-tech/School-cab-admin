@@ -3,7 +3,8 @@ import { StudentsTable } from "@/components/tables/StudentsTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useStudents } from "@/hooks/useStudents";
@@ -248,14 +249,16 @@ export default function Students() {
 }
 
 export function SchoolAdminStudentsPage() {
-  const { linkedSchoolId } = useAuth();
+  const { isModerator } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
+  const detailBasePath = isModerator ? "/moderator/students" : "/school-admin/students";
   return (
     <DashboardLayout>
-      {linkedSchoolId ? (
+      {activeSchoolId ? (
         <StudentsContent
-          schoolId={linkedSchoolId}
+          schoolId={activeSchoolId}
           readOnly
-          detailBasePath="/school-admin/students"
+          detailBasePath={detailBasePath}
         />
       ) : (
         <div className="text-center py-12 text-muted-foreground">

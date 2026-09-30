@@ -94,6 +94,8 @@ const mapDbToSchool = (row: SchoolDbRow): School => {
       row.livestream_quality === "480p" || row.livestream_quality === "360p"
         ? row.livestream_quality
         : "720p",
+    moderatorId: (row as any).moderator_id ?? null,
+    moderatorName: (row as any).moderators?.contact_person ?? null,
   };
 };
 
@@ -134,7 +136,7 @@ export const getSchools = async (filters?: SchoolFilter) => {
     // Select all columns including the school_id — exclude soft-deleted schools
     let query = (supabase as any)
       .from(SCHOOLS_TABLE)
-      .select("*", { count: "exact", head: false })
+      .select("*, moderators(contact_person)", { count: "exact", head: false })
       .is("deleted_at", null);
 
     // Apply filters
@@ -148,6 +150,10 @@ export const getSchools = async (filters?: SchoolFilter) => {
 
     if (filters?.search) {
       query = query.or(`name.ilike.%${filters.search}%,address.ilike.%${filters.search}%,city.ilike.%${filters.search}%,pincode.ilike.%${filters.search}%`);
+    }
+
+    if (filters?.moderatorId != null) {
+      query = query.eq("moderator_id", filters.moderatorId);
     }
 
     // Apply sorting

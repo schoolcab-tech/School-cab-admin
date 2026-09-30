@@ -1,6 +1,7 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useMySchoolAdmin } from "@/hooks/useSchoolAdmins";
 import { useSimpleQuery } from "@/hooks/useSimpleQuery";
 import { supabase } from "@/integrations/supabase/client";
@@ -86,16 +87,16 @@ export default function SchoolAdminDashboard() {
 }
 
 function SchoolAdminDashboardContent() {
-  const { linkedSchoolId } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
   const { data: profile, isLoading: profileLoading } = useMySchoolAdmin();
 
   const { data: stats, isLoading: statsLoading } = useSimpleQuery<DashboardStats>(
     () =>
-      linkedSchoolId
-        ? fetchSchoolDashboardStats(linkedSchoolId)
+      activeSchoolId
+        ? fetchSchoolDashboardStats(activeSchoolId)
         : Promise.resolve({ totalDrivers: 0, activeNow: 0, totalStudents: 0, tripsToday: 0 }),
-    [linkedSchoolId],
-    { enabled: !!linkedSchoolId, refetchInterval: 60000 }
+    [activeSchoolId],
+    { enabled: !!activeSchoolId, refetchInterval: 60000 }
   );
 
   if (profileLoading || statsLoading) {

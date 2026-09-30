@@ -44,9 +44,21 @@ interface SchoolsTableProps {
   onAddSchool?: () => void;
   onViewSchool?: (id: string) => void;
   onEditSchool?: (id: string) => void;
+  moderatorId?: number;
+  allowDelete?: boolean;
+  allowBulkUpload?: boolean;
+  showModeratorColumn?: boolean;
 }
 
-export function SchoolsTable({ onAddSchool, onViewSchool, onEditSchool }: SchoolsTableProps) {
+export function SchoolsTable({
+  onAddSchool,
+  onViewSchool,
+  onEditSchool,
+  moderatorId,
+  allowDelete = true,
+  allowBulkUpload = true,
+  showModeratorColumn = false,
+}: SchoolsTableProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,7 +82,8 @@ export function SchoolsTable({ onAddSchool, onViewSchool, onEditSchool }: School
     page: currentPage,
     limit: ITEMS_PER_PAGE,
     sortBy: 'name',
-    sortOrder: 'asc'
+    sortOrder: 'asc',
+    moderatorId,
   });
   
   const deleteSchool = useDeleteSchool();
@@ -161,10 +174,12 @@ export function SchoolsTable({ onAddSchool, onViewSchool, onEditSchool }: School
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/schools/bulk-upload')}>
-              <Upload className="h-4 w-4 mr-2" />
-              Bulk Upload
-            </Button>
+            {allowBulkUpload && (
+              <Button variant="outline" onClick={() => navigate('/schools/bulk-upload')}>
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+            )}
             <Button onClick={onAddSchool}>
               <Plus className="h-4 w-4 mr-2" />
               Add School
@@ -239,6 +254,7 @@ export function SchoolsTable({ onAddSchool, onViewSchool, onEditSchool }: School
                 <TableHead>Contact</TableHead>
                 <TableHead className="w-[100px]">Pincode</TableHead>
                 <TableHead className="w-[120px]">Status</TableHead>
+                {showModeratorColumn && <TableHead>Moderator</TableHead>}
                 <TableHead className="w-[150px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -279,6 +295,11 @@ export function SchoolsTable({ onAddSchool, onViewSchool, onEditSchool }: School
                         <span className="capitalize">{school.status}</span>
                       </div>
                     </TableCell>
+                    {showModeratorColumn && (
+                      <TableCell className="text-sm text-muted-foreground">
+                        {school.moderatorName || "—"}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex justify-end space-x-1">
                         <Button
@@ -314,20 +335,22 @@ export function SchoolsTable({ onAddSchool, onViewSchool, onEditSchool }: School
                             {school.status === 'active' ? 'Deactivate' : 'Activate'}
                           </span>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(school.id)}
-                          disabled={deleteSchool.isPending}
-                          className="text-destructive hover:text-destructive/80"
-                        >
-                          {deleteSchool.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">Delete</span>
-                        </Button>
+                        {allowDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(school.id)}
+                            disabled={deleteSchool.isPending}
+                            className="text-destructive hover:text-destructive/80"
+                          >
+                            {deleteSchool.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

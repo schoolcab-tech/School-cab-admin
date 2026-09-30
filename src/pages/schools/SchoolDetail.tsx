@@ -31,6 +31,7 @@ import {
   Video,
 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -137,7 +138,16 @@ export default function SchoolDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isModerator, moderatorId } = useAuth();
+  const schoolsBase = isModerator ? '/moderator/schools' : '/schools';
   const { data: school, isLoading, error } = useSchool(id || '');
+
+  useEffect(() => {
+    if (!isModerator || !school || moderatorId == null) return;
+    if (school.moderatorId !== moderatorId) {
+      navigate('/unauthorized', { replace: true });
+    }
+  }, [isModerator, moderatorId, school, navigate]);
 
   if (isLoading) {
     return (
@@ -155,7 +165,7 @@ export default function SchoolDetail() {
       description: 'Failed to load school details',
       variant: 'destructive',
     });
-    setTimeout(() => navigate('/schools'), 100);
+    setTimeout(() => navigate(schoolsBase), 100);
     return null;
   }
 
@@ -163,7 +173,7 @@ export default function SchoolDetail() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col space-y-2">
-          <Button variant="ghost" size="sm" className="w-fit pl-0" onClick={() => navigate('/schools')}>
+          <Button variant="ghost" size="sm" className="w-fit pl-0" onClick={() => navigate(schoolsBase)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Schools
           </Button>
@@ -178,7 +188,7 @@ export default function SchoolDetail() {
                 <span className="text-sm text-muted-foreground">ID: {school.code}</span>
               </div>
             </div>
-            <Button onClick={() => navigate(`/schools/${school.id}/edit`)}>
+            <Button onClick={() => navigate(`${schoolsBase}/${school.id}/edit`)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit School
             </Button>

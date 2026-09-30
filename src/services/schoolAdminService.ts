@@ -38,8 +38,10 @@ export type UpdateSchoolAdminInput = {
  * Get all school admins — master admin / admin only.
  * Joins with schools for display.
  */
-export const getAllSchoolAdmins = async (): Promise<SchoolAdminWithSchool[]> => {
-  const { data, error } = await db
+export const getAllSchoolAdmins = async (
+  options?: { schoolIds?: number[] }
+): Promise<SchoolAdminWithSchool[]> => {
+  let query = db
     .from("school_admins")
     .select(
       `
@@ -48,6 +50,12 @@ export const getAllSchoolAdmins = async (): Promise<SchoolAdminWithSchool[]> => 
     `
     )
     .order("created_at", { ascending: false });
+
+  if (options?.schoolIds?.length) {
+    query = query.in("school_id", options.schoolIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 

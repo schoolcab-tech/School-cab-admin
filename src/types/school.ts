@@ -48,6 +48,8 @@ export interface School {
   googlePlaceId?: string | null;
   livestreamEnabled: boolean;
   livestreamQuality: LivestreamQuality;
+  moderatorId?: number | null;
+  moderatorName?: string | null;
 }
 
 export interface CreateSchoolInput
@@ -75,4 +77,6 @@ export interface SchoolFilter {
   sortOrder?: "asc" | "desc";
   page?: number;
   limit?: number;
+  /** When set, only schools owned by this moderator */
+  moderatorId?: number;
 }

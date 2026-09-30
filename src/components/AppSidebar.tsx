@@ -173,6 +173,12 @@ const navigationItems: NavItem[] = [
     roles: ['master_admin'],
   },
   {
+    title: "Moderators",
+    url: "/master-admin/moderators",
+    icon: UserCog,
+    roles: ['master_admin'],
+  },
+  {
     title: "Live Tracking",
     url: "/master-admin/live-tracking",
     icon: MapPin,
@@ -331,6 +337,92 @@ const navigationItems: NavItem[] = [
     url: "/school-admin/reports",
     icon: FileText,
     roles: ['school_admin'],
+  },
+
+  // Moderator items
+  {
+    title: "Dashboard",
+    url: "/moderator/dashboard",
+    icon: LayoutDashboard,
+    roles: ['moderator'],
+  },
+  {
+    title: "Schools",
+    url: "/moderator/schools",
+    icon: GraduationCap,
+    roles: ['moderator'],
+  },
+  {
+    title: "School Admins",
+    url: "/moderator/school-admins",
+    icon: UserCog,
+    roles: ['moderator'],
+  },
+  {
+    title: "Students",
+    url: "/moderator/students",
+    icon: Users,
+    roles: ['moderator'],
+  },
+  {
+    title: "Bookings",
+    url: "/moderator/bookings",
+    icon: ClipboardList,
+    roles: ['moderator'],
+  },
+  {
+    title: "Payments",
+    url: "/moderator/payments",
+    icon: DollarSign,
+    roles: ['moderator'],
+  },
+  {
+    title: "Route Ordering",
+    url: "/moderator/route-ordering",
+    icon: Route,
+    roles: ['moderator'],
+  },
+  {
+    title: "Trip Schedules",
+    url: "/moderator/trip-schedules",
+    icon: Clock,
+    roles: ['moderator'],
+  },
+  {
+    title: "Drivers",
+    url: "/moderator/drivers",
+    icon: Car,
+    roles: ['moderator'],
+  },
+  {
+    title: "Vehicles",
+    url: "/moderator/vehicles",
+    icon: Truck,
+    roles: ['moderator'],
+  },
+  {
+    title: "Live Tracking",
+    url: "/moderator/live-tracking",
+    icon: MapPin,
+    roles: ['moderator'],
+  },
+  {
+    title: "Performance",
+    url: "/moderator/performance",
+    icon: TrendingUp,
+    roles: ['moderator'],
+  },
+  {
+    title: "Reports",
+    url: "/moderator/reports",
+    icon: FileText,
+    roles: ['moderator'],
+  },
+  {
+    title: "School Profile",
+    url: "/moderator/school",
+    icon: Building2,
+    roles: ['moderator'],
   },
 ];
 

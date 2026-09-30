@@ -2,6 +2,7 @@ import { useParams, useLocation } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DriverTrackingDetail } from "@/components/tracking/DriverTrackingDetail";
 import { useAuth } from "@/contexts/auth-context";
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useMySchoolAdmin } from "@/hooks/useSchoolAdmins";
 import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useSchool } from "@/hooks/useSchools";
@@ -20,7 +21,7 @@ export default function DriverTrackingDetailPage() {
 function Content() {
   const { driverId } = useParams<{ driverId: string }>();
   const location = useLocation();
-  const { linkedSchoolId } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
   const { data: profile } = useMySchoolAdmin();
   const { data: owner } = useMyFleetOwner();
   const { data: fleetDrivers = [] } = useSimpleQuery(
@@ -29,16 +30,21 @@ function Content() {
     { enabled: !!owner?.owner_id }
   );
 
-  const isSchoolAdmin = location.pathname.startsWith("/school-admin");
   const isSubAdmin = location.pathname.startsWith("/sub-admin");
+  const isModeratorRoute = location.pathname.startsWith("/moderator");
+  const isSchoolAdminRoute = location.pathname.startsWith("/school-admin");
+  const isSchoolScoped = isSchoolAdminRoute || isModeratorRoute;
+
   const listPath = isSubAdmin
     ? "/sub-admin/live-tracking"
-    : isSchoolAdmin
-      ? "/school-admin/live-tracking"
-      : "/master-admin/live-tracking";
+    : isModeratorRoute
+      ? "/moderator/live-tracking"
+      : isSchoolAdminRoute
+        ? "/school-admin/live-tracking"
+        : "/master-admin/live-tracking";
 
   const { data: school } = useSchool(
-    isSchoolAdmin && linkedSchoolId ? String(linkedSchoolId) : ""
+    isSchoolScoped && activeSchoolId ? String(activeSchoolId) : ""
   );
 
   if (!driverId || Number.isNaN(Number(driverId))) {
@@ -47,10 +53,10 @@ function Content() {
     );
   }
 
-  if (isSchoolAdmin && !linkedSchoolId) {
+  if (isSchoolScoped && !activeSchoolId) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        School not linked to your account.
+        Select a school using the switcher in the header, or contact support if none appear.
       </div>
     );
   }
@@ -73,34 +79,34 @@ function Content() {
 
   const schoolLat = school?.latitude ?? null;
   const schoolLng = school?.longitude ?? null;
+  const schoolLabel = profile?.school_name ?? school?.name;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Driver Tracking</h1>
-        {isSchoolAdmin && profile?.school_name && (
-          <p className="text-sm text-muted-foreground">{profile.school_name}</p>
+        {isSchoolScoped && schoolLabel && (
+          <p className="text-sm text-muted-foreground">{schoolLabel}</p>
         )}
       </div>
 
       <DriverTrackingDetail
         driverId={Number(driverId)}
         listPath={listPath}
-        schoolId={isSchoolAdmin ? linkedSchoolId ?? undefined : undefined}
+        schoolId={isSchoolScoped ? activeSchoolId ?? undefined : undefined}
         driverIds={fleetDriverIds}
         schoolCenter={
-          isSchoolAdmin &&
+          isSchoolScoped &&
           schoolLat != null &&
           schoolLng != null &&
-          profile?.school_name
+          schoolLabel
             ? {
                 latitude: Number(schoolLat),
                 longitude: Number(schoolLng),
-                name: profile.school_name,
+                name: schoolLabel,
               }
-            : null
+            : undefined
         }
-        refetchInterval={15000}
       />
     </div>
   );

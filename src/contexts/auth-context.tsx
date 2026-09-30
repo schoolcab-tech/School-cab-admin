@@ -14,6 +14,9 @@ type AuthContextType = {
   isSubAdmin: boolean;
   /** New: school sub-admin role (one per school) */
   isSchoolAdmin: boolean;
+  isModerator: boolean;
+  /** Moderators row id when role is moderator */
+  moderatorId: number | null;
   /** The school this user is bound to (school_admins.school_id). Null for non-school-admins. */
   linkedSchoolId: number | null;
   userRole: UserRole | null;
@@ -37,6 +40,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMasterAdmin, setIsMasterAdmin] = useState(false);
   const [isSubAdmin, setIsSubAdmin] = useState(false);
   const [isSchoolAdmin, setIsSchoolAdmin] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const [moderatorId, setModeratorId] = useState<number | null>(null);
   const [linkedSchoolId, setLinkedSchoolId] = useState<number | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isSuspended, setIsSuspended] = useState(false);
@@ -72,6 +77,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setIsMasterAdmin(false);
             setIsSubAdmin(false);
             setIsSchoolAdmin(false);
+            setIsModerator(false);
+            setModeratorId(null);
             setLinkedSchoolId(null);
             setUserRole(null);
             setIsSuspended(false);
@@ -84,6 +91,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsAdmin(false);
           setIsMasterAdmin(false);
           setIsSubAdmin(false);
+          setIsModerator(false);
+          setModeratorId(null);
           setUserRole(null);
           setIsSuspended(false);
         }
@@ -118,6 +127,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsAdmin(false);
           setIsMasterAdmin(false);
           setIsSubAdmin(false);
+          setIsSchoolAdmin(false);
+          setIsModerator(false);
+          setModeratorId(null);
+          setLinkedSchoolId(null);
           setUserRole(null);
           setIsSuspended(false);
         }
@@ -175,12 +188,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const isUserMasterAdmin = roleStr === 'master_admin';
       const isUserSubAdmin = roleStr === 'sub_admin';
       const isUserSchoolAdmin = roleStr === 'school_admin';
+      const isUserModerator = roleStr === 'moderator';
       // `isAdmin` is the broad "has admin-style access" flag — includes all elevated roles
-      const isUserAdmin = roleStr === 'admin' || isUserMasterAdmin || isUserSubAdmin || isUserSchoolAdmin;
+      const isUserAdmin =
+        roleStr === 'admin' ||
+        isUserMasterAdmin ||
+        isUserSubAdmin ||
+        isUserSchoolAdmin ||
+        isUserModerator;
 
       // Check suspension and resolve linked school
       let suspended = false;
       let schoolId: number | null = null;
+      let modId: number | null = null;
 
       if (isUserSubAdmin) {
         console.log(`checkUserRole: Checking suspension status for fleet-owner sub-admin ${userId}`);
@@ -211,6 +231,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           suspended = !schoolAdmin?.is_active;
           schoolId = schoolAdmin?.school_id ?? null;
         }
+      } else if (isUserModerator) {
+        console.log(`checkUserRole: Checking suspension status for moderator ${userId}`);
+        const { data: moderator, error: moderatorError } = await (supabase as any)
+          .from('moderators')
+          .select('is_active, moderator_id')
+          .eq('user_id', userId)
+          .single();
+
+        if (moderatorError) {
+          console.error('checkUserRole: Error fetching moderator status:', moderatorError);
+          suspended = true;
+        } else {
+          suspended = !moderator?.is_active;
+          modId = moderator?.moderator_id ?? null;
+        }
       } else if (isUserMasterAdmin || roleStr === 'admin') {
         const { data: platformAdmin } = await (supabase as any)
           .from('platform_admins')
@@ -227,6 +262,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsMasterAdmin(isUserMasterAdmin);
       setIsSubAdmin(isUserSubAdmin);
       setIsSchoolAdmin(isUserSchoolAdmin);
+      setIsModerator(isUserModerator);
+      setModeratorId(modId);
       setLinkedSchoolId(schoolId);
       setIsSuspended(suspended);
 
@@ -238,6 +275,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsMasterAdmin(false);
         setIsSubAdmin(false);
         setIsSchoolAdmin(false);
+        setIsModerator(false);
+        setModeratorId(null);
         setLinkedSchoolId(null);
         setUserRole(null);
         return;
@@ -249,6 +288,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isMasterAdmin: isUserMasterAdmin,
         isSubAdmin: isUserSubAdmin,
         isSchoolAdmin: isUserSchoolAdmin,
+        isModerator: isUserModerator,
+        moderatorId: modId,
         linkedSchoolId: schoolId,
         isSuspended: suspended,
       });
@@ -258,6 +299,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsMasterAdmin(false);
       setIsSubAdmin(false);
       setIsSchoolAdmin(false);
+      setIsModerator(false);
+      setModeratorId(null);
       setLinkedSchoolId(null);
       setUserRole(null);
       setIsSuspended(false);
@@ -350,6 +393,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsMasterAdmin(false);
       setIsSubAdmin(false);
       setIsSchoolAdmin(false);
+      setIsModerator(false);
+      setModeratorId(null);
       setLinkedSchoolId(null);
       setUserRole(null);
       setIsSuspended(false);
@@ -369,6 +414,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isMasterAdmin,
     isSubAdmin,
     isSchoolAdmin,
+    isModerator,
+    moderatorId,
     linkedSchoolId,
     userRole,
     isSuspended,

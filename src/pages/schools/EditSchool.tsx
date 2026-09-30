@@ -4,13 +4,16 @@ import { useToast } from '@/components/ui/use-toast';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { SchoolForm } from '@/components/forms/SchoolForm';
 import { useSchool, useUpdateSchool } from '@/hooks/useSchools';
-import { School, UpdateSchoolInput } from '@/types/school';
+import { UpdateSchoolInput } from '@/types/school';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function EditSchool() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isModerator, moderatorId } = useAuth();
+  const schoolsBase = isModerator ? '/moderator/schools' : '/schools';
   const { data: school, isLoading, error } = useSchool(id || '');
   const updateSchool = useUpdateSchool();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,9 +25,16 @@ export default function EditSchool() {
         description: 'Failed to load school details',
         variant: 'destructive',
       });
-      navigate('/schools');
+      navigate(schoolsBase);
     }
-  }, [error, navigate, toast]);
+  }, [error, navigate, toast, schoolsBase]);
+
+  useEffect(() => {
+    if (!isModerator || !school || moderatorId == null) return;
+    if (school.moderatorId !== moderatorId) {
+      navigate('/unauthorized', { replace: true });
+    }
+  }, [isModerator, moderatorId, school, navigate]);
 
   const handleSubmit = async (data: UpdateSchoolInput) => {
     if (!id) return;
@@ -41,7 +51,7 @@ export default function EditSchool() {
       
       // Redirect to school detail page after a short delay
       setTimeout(() => {
-        navigate(`/schools/${id}`);
+        navigate(`${schoolsBase}/${id}`);
       }, 1000);
     } catch (error) {
       console.error('Error updating school:', error);

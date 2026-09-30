@@ -2,7 +2,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useSimpleQuery } from "@/hooks/useSimpleQuery";
 import {
   getHourlyTripDistribution,
@@ -54,8 +55,8 @@ export function SchoolAdminPerformancePage() {
 }
 
 function SchoolAdminPerformanceContent() {
-  const { linkedSchoolId } = useAuth();
-  return <PerformanceContent schoolId={linkedSchoolId ?? undefined} />;
+  const activeSchoolId = useActiveSchoolId();
+  return <PerformanceContent schoolId={activeSchoolId ?? undefined} />;
 }
 
 function PerformanceContent({ schoolId }: PerformancePageProps = {}) {

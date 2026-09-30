@@ -87,6 +87,14 @@ import LiveTrackingPage from "./pages/master-admin/LiveTrackingPage";
 import DriverTrackingDetailPage from "./pages/tracking/DriverTrackingDetailPage";
 import SchoolAdminsPage from "./pages/master-admin/SchoolAdminsPage";
 import PlatformAdminsPage from "./pages/master-admin/PlatformAdminsPage";
+import ModeratorsPage from "./pages/master-admin/ModeratorsPage";
+
+// Moderator Pages
+import ModeratorDashboard from "./pages/moderator/ModeratorDashboard";
+import ModeratorSchoolsPage from "./pages/moderator/ModeratorSchoolsPage";
+import ModeratorAddSchoolPage from "./pages/moderator/ModeratorAddSchoolPage";
+import ModeratorSchoolAdminsPage from "./pages/moderator/ModeratorSchoolAdminsPage";
+import { ModeratorSchoolProvider } from "./contexts/moderator-school-context";
 
 // Sub-Admin Pages
 import MyEarningsPage from "./pages/sub-admin/MyEarningsPage";
@@ -491,6 +499,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/master-admin/moderators"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin"]}>
+            <ModeratorsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/master-admin/live-tracking"
         element={
           <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
@@ -669,6 +685,184 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Moderator Routes */}
+      <Route
+        path="/moderator/dashboard"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <ModeratorDashboard />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/schools"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <ModeratorSchoolsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/schools/new"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <ModeratorAddSchoolPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/schools/:id"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolDetail />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/schools/:id/edit"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <EditSchool />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/school-admins"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <ModeratorSchoolAdminsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/students"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminStudentsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/students/:id"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminStudentDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/bookings"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminBookingsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/bookings/:bookingId"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminBookingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/payments"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminPaymentsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/route-ordering"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminRouteOrderingPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/route-ordering/:driverId/:schoolId"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminRouteOrderingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/route-ordering/:driverId/:schoolId/trips"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminDriverTripManagement />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/trip-schedules"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminTripSchedulesPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/drivers"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminDriversPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/vehicles"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminVehiclesPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/live-tracking"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminLiveTrackingPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/live-tracking/:driverId"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <DriverTrackingDetailPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/performance"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminPerformancePage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/reports"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminReportsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/school"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <SchoolAdminProfilePage />
+          </RoleBasedRoute>
+        }
+      />
+
       {/* Sub-Admin Routes */}
       <Route
         path="/sub-admin/dashboard"
@@ -771,13 +965,15 @@ const AppRoutes = () => {
 
 const App = () => (
   <AuthProvider>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </TooltipProvider>
+    <ModeratorSchoolProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </TooltipProvider>
+    </ModeratorSchoolProvider>
   </AuthProvider>
 );
 

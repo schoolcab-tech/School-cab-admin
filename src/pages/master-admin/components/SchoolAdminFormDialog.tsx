@@ -46,16 +46,22 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  /** Limit school dropdown to these ids (moderator-owned schools) */
+  schoolIds?: number[];
 }
 
-export function SchoolAdminFormDialog({ open, onOpenChange, onCreated }: Props) {
+export function SchoolAdminFormDialog({ open, onOpenChange, onCreated, schoolIds }: Props) {
   const createMutation = useCreateSchoolAdmin();
   // getSchools returns { data, count, page, limit, totalPages }. Pass a high limit
   // to fetch all schools in one go for the dropdown.
   const { data: schoolsResult } = useSchools({ limit: 1000, page: 1 } as any);
-  const schools: any[] = Array.isArray(schoolsResult)
+  let schools: any[] = Array.isArray(schoolsResult)
     ? schoolsResult
     : (schoolsResult as any)?.data ?? [];
+  if (schoolIds?.length) {
+    const allowed = new Set(schoolIds.map(String));
+    schools = schools.filter((s) => allowed.has(String(s.id)));
+  }
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),

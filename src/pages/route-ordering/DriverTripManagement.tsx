@@ -31,7 +31,8 @@ import {
   useOptimizeTripRoute,
   useReorderTripStudents,
 } from "@/hooks/useDriverTrips";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import {
   ArrowLeft,
   Bus,
@@ -544,13 +545,15 @@ export function SubAdminDriverTripManagement() {
 }
 
 export function SchoolAdminDriverTripManagement() {
-  const { linkedSchoolId } = useAuth();
+  const { isModerator } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
+  const listBasePath = isModerator ? "/moderator/route-ordering" : "/school-admin/route-ordering";
   return (
     <DashboardLayout>
-      {linkedSchoolId ? (
+      {activeSchoolId ? (
         <DriverTripManagementContent
-          listBasePath="/school-admin/route-ordering"
-          linkedSchoolId={linkedSchoolId}
+          listBasePath={listBasePath}
+          linkedSchoolId={activeSchoolId}
         />
       ) : (
         <div className="text-center py-12 text-muted-foreground">

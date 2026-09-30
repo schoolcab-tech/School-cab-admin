@@ -15,8 +15,12 @@ import { useSimpleQuery } from "./useSimpleQuery";
 import { useSimpleMutation } from "./useSimpleMutation";
 import { useAuth } from "@/contexts/auth-context";
 
-export const useSchoolAdmins = () => {
-  return useSimpleQuery<SchoolAdminWithSchool[]>(() => getAllSchoolAdmins(), []);
+export const useSchoolAdmins = (options?: { schoolIds?: number[] }) => {
+  const key = options?.schoolIds?.join(",") ?? "all";
+  return useSimpleQuery<SchoolAdminWithSchool[]>(
+    () => getAllSchoolAdmins(options),
+    [key]
+  );
 };
 
 export const useSchoolAdmin = (id: number | null) => {

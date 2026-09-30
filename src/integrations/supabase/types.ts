@@ -1319,6 +1319,7 @@ export type Database = {
           principal_contact: string | null
           principal_name: string | null
           route_count: number | null
+          moderator_id: number | null
           school_id: number
           state: string | null
           status: string | null
@@ -1340,6 +1341,7 @@ export type Database = {
           location_accuracy?: number | null
           location_source?: string | null
           longitude?: number | null
+          moderator_id?: number | null
           name: string
           operating_hours?: Json | null
           pincode: string
@@ -1367,6 +1369,7 @@ export type Database = {
           location_accuracy?: number | null
           location_source?: string | null
           longitude?: number | null
+          moderator_id?: number | null
           name?: string
           operating_hours?: Json | null
           pincode?: string
@@ -1970,7 +1973,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      app_role: "user" | "driver" | "admin" | "master_admin" | "sub_admin" | "school_admin"
+      app_role: "user" | "driver" | "admin" | "master_admin" | "sub_admin" | "school_admin" | "moderator"
       booking_status:
         | "pending"
         | "confirmed"
@@ -2109,7 +2112,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["user", "driver", "admin", "master_admin", "sub_admin", "school_admin"],
+      app_role: ["user", "driver", "admin", "master_admin", "sub_admin", "school_admin", "moderator"],
       booking_status: [
         "pending",
         "confirmed",

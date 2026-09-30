@@ -63,6 +63,7 @@ export default function Schools() {
           onAddSchool={handleAddSchool}
           onViewSchool={handleViewSchool}
           onEditSchool={handleEditSchool}
+          showModeratorColumn
         />
       </div>
     </DashboardLayout>

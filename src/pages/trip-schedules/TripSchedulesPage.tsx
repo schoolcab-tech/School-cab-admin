@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import {
   useActivateTripSchedule,
   useAlertsByDate,
@@ -140,11 +141,11 @@ export default function TripSchedulesPage() {
 }
 
 export function SchoolAdminTripSchedulesPage() {
-  const { linkedSchoolId } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
   return (
     <DashboardLayout>
-      {linkedSchoolId ? (
-        <TripSchedulesContent schoolId={linkedSchoolId} readOnly />
+      {activeSchoolId ? (
+        <TripSchedulesContent schoolId={activeSchoolId} readOnly />
       ) : (
         <div className="text-center py-12 text-muted-foreground">
           No school linked to your account.

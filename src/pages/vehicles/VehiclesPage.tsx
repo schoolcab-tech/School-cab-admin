@@ -18,7 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useMyFleetOwner } from "@/hooks/useFleetOwners";
 import { useOwnerDrivers } from "@/hooks/useFleetMappings";
 import { useSimpleQuery } from "@/hooks/useSimpleQuery";
@@ -66,10 +67,10 @@ export function SchoolAdminVehiclesPage() {
 }
 
 function SchoolAdminVehiclesContent() {
-  const { linkedSchoolId } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
   return (
     <VehiclesContent
-      schoolId={linkedSchoolId ?? undefined}
+      schoolId={activeSchoolId ?? undefined}
       exportPrefix="school-vehicles"
     />
   );

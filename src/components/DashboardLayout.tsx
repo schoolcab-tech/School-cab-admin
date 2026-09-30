@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { ModeratorSchoolSwitcher } from "@/components/ModeratorSchoolSwitcher"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
@@ -46,11 +47,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Header */}
           <header className="h-16 border-b bg-card flex items-center justify-between px-6">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+              <SidebarTrigger className="text-muted-foreground hover:text-foreground shrink-0" />
+              <ModeratorSchoolSwitcher />
               
               {/* Search Bar */}
-              <div className="relative hidden md:block">
+              <div className="relative hidden lg:block">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"

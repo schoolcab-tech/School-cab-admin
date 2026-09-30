@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import {
   useCancelDriverDeleteRequest,
   useCreateDriverDeleteRequest,
@@ -55,7 +56,8 @@ export default function SchoolAdminDriversPage() {
 }
 
 function Content() {
-  const { linkedSchoolId, user } = useAuth();
+  const { user } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
   const { data: mySchoolAdmin } = useMySchoolAdmin();
   const [searchTerm, setSearchTerm] = useState("");
   const [requestDialog, setRequestDialog] = useState<{
@@ -70,11 +72,11 @@ function Content() {
     error,
   } = useSimpleQuery<DriverLiveLocation[]>(
     () =>
-      linkedSchoolId
-        ? getLiveDriverLocations({ schoolId: linkedSchoolId })
+      activeSchoolId
+        ? getLiveDriverLocations({ schoolId: activeSchoolId })
         : Promise.resolve([]),
-    [linkedSchoolId],
-    { enabled: !!linkedSchoolId, refetchInterval: 30000 }
+    [activeSchoolId],
+    { enabled: !!activeSchoolId, refetchInterval: 30000 }
   );
 
   const {
@@ -118,7 +120,7 @@ function Content() {
   };
 
   const handleSubmitRequest = async () => {
-    if (!requestDialog.driver || !mySchoolAdmin || !linkedSchoolId || !user) {
+    if (!requestDialog.driver || !mySchoolAdmin || !activeSchoolId || !user) {
       return;
     }
 
@@ -135,7 +137,7 @@ function Content() {
     try {
       await createRequest.mutateAsync({
         schoolAdminId: mySchoolAdmin.school_admin_id,
-        schoolId: linkedSchoolId,
+        schoolId: activeSchoolId,
         driverId: requestDialog.driver.driver_id,
         reason: trimmed,
       });
@@ -170,7 +172,7 @@ function Content() {
     }
   };
 
-  if (!linkedSchoolId) {
+  if (!activeSchoolId) {
     return (
       <Card>
         <CardContent className="p-8 text-center text-muted-foreground">

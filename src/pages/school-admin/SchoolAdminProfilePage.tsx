@@ -1,22 +1,23 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { SchoolForm } from "@/components/forms/SchoolForm";
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useSchool, useUpdateSchool } from "@/hooks/useSchools";
 import { UpdateSchoolInput } from "@/types/school";
 import { Building2, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 export function SchoolAdminProfileContent() {
-  const { linkedSchoolId } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
   const { toast } = useToast();
   const { data: school, isLoading, error } = useSchool(
-    linkedSchoolId ? String(linkedSchoolId) : ""
+    activeSchoolId ? String(activeSchoolId) : ""
   );
   const updateSchool = useUpdateSchool();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!linkedSchoolId) {
+  if (!activeSchoolId) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         No school linked to your account.
@@ -44,7 +45,7 @@ export function SchoolAdminProfileContent() {
     try {
       setIsSubmitting(true);
       await updateSchool.mutateAsync({
-        id: String(linkedSchoolId),
+        id: String(activeSchoolId),
         data: {
           contact: data.contact,
           address: data.address,

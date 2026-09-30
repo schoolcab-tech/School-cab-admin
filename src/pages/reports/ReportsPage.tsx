@@ -19,7 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useDrivers } from "@/hooks/useDrivers";
 import { useSimpleQuery } from "@/hooks/useSimpleQuery";
 import {
@@ -53,8 +54,8 @@ export function SchoolAdminReportsPage() {
 }
 
 function SchoolAdminReportsContent() {
-  const { linkedSchoolId } = useAuth();
-  return <ReportsContent schoolId={linkedSchoolId ?? undefined} />;
+  const activeSchoolId = useActiveSchoolId();
+  return <ReportsContent schoolId={activeSchoolId ?? undefined} />;
 }
 
 function ReportsContent({ schoolId }: ReportsPageProps = {}) {

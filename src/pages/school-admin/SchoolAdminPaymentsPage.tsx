@@ -16,7 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useSchoolPayments } from "@/hooks/useSchoolPayments";
 import { ExportButton } from "@/components/ExportButton";
 import { format } from "date-fns";
@@ -33,12 +34,12 @@ function formatCurrency(amount: number) {
 }
 
 export function SchoolAdminPaymentsContent() {
-  const { linkedSchoolId } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
   const { data: payments = [], isLoading, error } = useSchoolPayments(
-    linkedSchoolId ?? undefined,
+    activeSchoolId ?? undefined,
     { month: selectedMonth, status: selectedStatus }
   );
 
@@ -64,7 +65,7 @@ export function SchoolAdminPaymentsContent() {
     return months;
   }, []);
 
-  if (!linkedSchoolId) {
+  if (!activeSchoolId) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         No school linked to your account.

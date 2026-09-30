@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useBookingsBySchool } from "@/hooks/useBookings";
 import { ExportButton } from "@/components/ExportButton";
 import { format } from "date-fns";
@@ -20,10 +21,12 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function SchoolAdminBookingsContent() {
-  const { linkedSchoolId } = useAuth();
+  const { isModerator } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
+  const bookingsBase = isModerator ? "/moderator/bookings" : "/school-admin/bookings";
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: bookings = [], isLoading, error } = useBookingsBySchool(linkedSchoolId ?? undefined);
+  const { data: bookings = [], isLoading, error } = useBookingsBySchool(activeSchoolId ?? undefined);
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -48,7 +51,7 @@ export function SchoolAdminBookingsContent() {
     }
   };
 
-  if (!linkedSchoolId) {
+  if (!activeSchoolId) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         No school linked to your account.
@@ -140,7 +143,7 @@ export function SchoolAdminBookingsContent() {
                         variant="outline"
                         size="sm"
                         onClick={() =>
-                          navigate(`/school-admin/bookings/${booking.booking_id}`)
+                          navigate(`${bookingsBase}/${booking.booking_id}`)
                         }
                       >
                         <Eye className="mr-2 h-4 w-4" />

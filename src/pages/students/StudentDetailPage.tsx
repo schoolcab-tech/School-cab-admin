@@ -2,7 +2,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { useDeleteStudent } from "@/hooks/useStudents";
 import { useState, useEffect } from "react";
 import {
@@ -294,13 +295,15 @@ export default function StudentDetailPage() {
 }
 
 export function SchoolAdminStudentDetailPage() {
-  const { linkedSchoolId } = useAuth();
+  const { isModerator } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
+  const listPath = isModerator ? "/moderator/students" : "/school-admin/students";
   return (
     <DashboardLayout>
       <StudentDetailContent
         readOnly
-        listPath="/school-admin/students"
-        linkedSchoolId={linkedSchoolId ?? undefined}
+        listPath={listPath}
+        linkedSchoolId={activeSchoolId ?? undefined}
       />
     </DashboardLayout>
   );

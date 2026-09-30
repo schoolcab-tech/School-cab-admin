@@ -1,6 +1,15 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -10,67 +19,63 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  useActivateModerator,
+  useDeleteModerator,
+  useModerators,
+  useSuspendModerator,
+} from "@/hooks/useModerators";
+import { format } from "date-fns";
 import {
-  useSchoolAdmins,
-  useSuspendSchoolAdmin,
-  useActivateSchoolAdmin,
-  useDeleteSchoolAdmin,
-} from "@/hooks/useSchoolAdmins";
-import { useState } from "react";
-import {
-  Building2,
   CheckCircle,
   Loader2,
   Mail,
   MoreVertical,
   Phone,
   Plus,
-  School,
   Search,
   User,
+  UserCog,
   XCircle,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { SchoolAdminFormDialog } from "./components/SchoolAdminFormDialog";
-import type { SchoolAdminWithSchool } from "@/services/schoolAdminService";
+import { ModeratorFormDialog } from "./components/ModeratorFormDialog";
+import { ModeratorAssignSchoolsDialog } from "./components/ModeratorAssignSchoolsDialog";
+import type { ModeratorWithSchoolCount } from "@/services/moderatorService";
 
-type SchoolAdminsContentProps = {
-  allowDelete?: boolean;
-  schoolIds?: number[];
-  title?: string;
-  description?: string;
-};
-
-export function SchoolAdminsContent({
-  allowDelete = true,
-  schoolIds,
-  title = "School Admins",
-  description = "Manage school-bound sub-admin accounts. Each can only see drivers serving their school.",
-}: SchoolAdminsContentProps) {
-  const { data: admins, isLoading, error, refetch } = useSchoolAdmins(
-    schoolIds?.length ? { schoolIds } : undefined
+export default function ModeratorsPage() {
+  return (
+    <DashboardLayout>
+      <ModeratorsContent />
+    </DashboardLayout>
   );
+}
+
+function ModeratorsContent() {
+  const { data: moderators, isLoading, error, refetch } = useModerators();
   const [searchTerm, setSearchTerm] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<ModeratorWithSchoolCount | null>(null);
 
-  const suspendMutation = useSuspendSchoolAdmin();
-  const activateMutation = useActivateSchoolAdmin();
-  const deleteMutation = useDeleteSchoolAdmin();
+  const suspendMutation = useSuspendModerator();
+  const activateMutation = useActivateModerator();
+  const deleteMutation = useDeleteModerator();
+
+  const filtered = (moderators || []).filter((m) => {
+    if (!searchTerm) return true;
+    const s = searchTerm.toLowerCase();
+    return (
+      m.contact_person.toLowerCase().includes(s) ||
+      m.email.toLowerCase().includes(s) ||
+      m.phone.toLowerCase().includes(s)
+    );
+  });
 
   const handleSuspend = async (id: number) => {
     try {
       await suspendMutation.mutateAsync(id);
-      toast.success("School admin suspended");
+      toast.success("Moderator suspended");
       refetch();
     } catch (e: any) {
       toast.error("Failed to suspend: " + e.message);
@@ -80,46 +85,35 @@ export function SchoolAdminsContent({
   const handleActivate = async (id: number) => {
     try {
       await activateMutation.mutateAsync(id);
-      toast.success("School admin activated");
+      toast.success("Moderator activated");
       refetch();
     } catch (e: any) {
       toast.error("Failed to activate: " + e.message);
     }
   };
 
-  const handleDelete = async (admin: SchoolAdminWithSchool) => {
+  const handleDelete = async (m: ModeratorWithSchoolCount) => {
     if (
       !window.confirm(
-        `Delete school admin for "${admin.school_name}"? This will also delete their user account.`
+        `Delete moderator "${m.contact_person}"? Their schools will be unassigned and their login removed.`
       )
     ) {
       return;
     }
     try {
-      await deleteMutation.mutateAsync(admin.school_admin_id);
-      toast.success("School admin deleted");
+      await deleteMutation.mutateAsync(m.moderator_id);
+      toast.success("Moderator deleted");
       refetch();
     } catch (e: any) {
       toast.error("Failed to delete: " + e.message);
     }
   };
 
-  const filtered = (admins || []).filter((a) => {
-    if (!searchTerm) return true;
-    const s = searchTerm.toLowerCase();
-    return (
-      a.school_name?.toLowerCase().includes(s) ||
-      a.contact_person.toLowerCase().includes(s) ||
-      a.email.toLowerCase().includes(s) ||
-      a.phone.toLowerCase().includes(s)
-    );
-  });
-
   if (error) {
     return (
       <Card>
         <CardContent className="p-8 text-center text-destructive">
-          Error loading school admins: {error.message}
+          Error loading moderators: {error.message}
         </CardContent>
       </Card>
     );
@@ -130,34 +124,33 @@ export function SchoolAdminsContent({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <School className="h-7 w-7" />
-            {title}
+            <UserCog className="h-7 w-7" />
+            Moderators
           </h1>
-          <p className="text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground">
+            School providers who manage multiple schools without full platform admin access.
+          </p>
         </div>
         <Button onClick={() => setIsFormOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add School Admin
+          Add Moderator
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by school, contact, email, phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Badge variant="outline">{filtered.length} of {admins?.length || 0}</Badge>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && !admins ? (
+          {isLoading && !moderators ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
@@ -165,44 +158,41 @@ export function SchoolAdminsContent({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>School</TableHead>
-                  <TableHead>Contact Person</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>Schools</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-10"></TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((a) => (
-                  <TableRow key={a.school_admin_id}>
+                {filtered.map((m) => (
+                  <TableRow key={m.moderator_id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{a.school_name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-sm">
-                        <User className="h-3 w-3 text-muted-foreground" />
-                        {a.contact_person}
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        {m.contact_person}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
                         <Mail className="h-3 w-3 text-muted-foreground" />
-                        {a.email}
+                        {m.email}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
                         <Phone className="h-3 w-3 text-muted-foreground" />
-                        {a.phone}
+                        {m.phone}
                       </div>
                     </TableCell>
                     <TableCell>
-                      {a.is_active ? (
+                      <Badge variant="outline">{m.school_count ?? 0}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {m.is_active ? (
                         <Badge variant="outline" className="text-green-600 border-green-300">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Active
@@ -215,7 +205,7 @@ export function SchoolAdminsContent({
                       )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(a.created_at), "dd MMM yyyy")}
+                      {format(new Date(m.created_at), "dd MMM yyyy")}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -227,28 +217,25 @@ export function SchoolAdminsContent({
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          {a.is_active ? (
-                            <DropdownMenuItem onClick={() => handleSuspend(a.school_admin_id)}>
-                              <XCircle className="mr-2 h-4 w-4" />
+                          <DropdownMenuItem onClick={() => setAssignTarget(m)}>
+                            Assign schools
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {m.is_active ? (
+                            <DropdownMenuItem onClick={() => handleSuspend(m.moderator_id)}>
                               Suspend
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem onClick={() => handleActivate(a.school_admin_id)}>
-                              <CheckCircle className="mr-2 h-4 w-4" />
+                            <DropdownMenuItem onClick={() => handleActivate(m.moderator_id)}>
                               Activate
                             </DropdownMenuItem>
                           )}
-                          {allowDelete && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => handleDelete(a)}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDelete(m)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -257,7 +244,7 @@ export function SchoolAdminsContent({
                 {filtered.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      No school admins found
+                      No moderators found
                     </TableCell>
                   </TableRow>
                 )}
@@ -267,20 +254,13 @@ export function SchoolAdminsContent({
         </CardContent>
       </Card>
 
-      <SchoolAdminFormDialog
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        onCreated={() => refetch()}
-        schoolIds={schoolIds}
+      <ModeratorFormDialog open={isFormOpen} onOpenChange={setIsFormOpen} onCreated={() => refetch()} />
+      <ModeratorAssignSchoolsDialog
+        moderator={assignTarget}
+        open={!!assignTarget}
+        onOpenChange={(open) => !open && setAssignTarget(null)}
+        onUpdated={() => refetch()}
       />
     </div>
-  );
-}
-
-export default function SchoolAdminsPage() {
-  return (
-    <DashboardLayout>
-      <SchoolAdminsContent />
-    </DashboardLayout>
   );
 }

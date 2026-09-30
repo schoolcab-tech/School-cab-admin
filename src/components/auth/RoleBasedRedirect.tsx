@@ -34,6 +34,8 @@ export const RoleBasedRedirect = () => {
       return <Navigate to="/sub-admin/dashboard" replace />;
     case 'school_admin':
       return <Navigate to="/school-admin/dashboard" replace />;
+    case 'moderator':
+      return <Navigate to="/moderator/dashboard" replace />;
     case 'master_admin':
     case 'admin':
       return <Navigate to="/dashboard" replace />;

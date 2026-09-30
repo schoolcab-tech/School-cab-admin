@@ -12,7 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context"
+import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import { getBookingSchoolId } from "@/services/bookingService";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -188,12 +189,14 @@ export default function BookingDetailPage() {
 }
 
 export function SchoolAdminBookingDetailPage() {
-  const { linkedSchoolId } = useAuth();
+  const { isModerator } = useAuth();
+  const activeSchoolId = useActiveSchoolId();
+  const listPath = isModerator ? "/moderator/bookings" : "/school-admin/bookings";
   return (
     <DashboardLayout>
       <BookingDetailContent
-        listPath="/school-admin/bookings"
-        linkedSchoolId={linkedSchoolId ?? undefined}
+        listPath={listPath}
+        linkedSchoolId={activeSchoolId ?? undefined}
       />
     </DashboardLayout>
   );
