@@ -48,6 +48,10 @@ export interface School {
   googlePlaceId?: string | null;
   livestreamEnabled: boolean;
   livestreamQuality: LivestreamQuality;
+  /** Parents and school tracking show arrival time when true. */
+  etaEnabled: boolean;
+  /** Cab approaching, pickup, and drop alerts to parents when true. */
+  notificationsEnabled: boolean;
   moderatorId?: number | null;
   moderatorName?: string | null;
 }

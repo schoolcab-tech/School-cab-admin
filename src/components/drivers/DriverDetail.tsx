@@ -38,9 +38,15 @@ export function DriverDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { userRole, isMasterAdmin } = useAuth();
+  const { userRole, isMasterAdmin, isSchoolAdmin, isModerator } = useAuth();
   const canDeleteDriver =
     isMasterAdmin || (userRole as string | null) === "admin";
+  const canEditDriver = canDeleteDriver;
+  const backHref = isSchoolAdmin
+    ? "/school-admin/drivers"
+    : isModerator
+      ? "/moderator/drivers"
+      : "/drivers";
 
   const { data: driver, isLoading: loadingDriver } = useDriver(id!);
   const { data: stats, isLoading: loadingStats } = useDriverStats(id!);
@@ -74,7 +80,7 @@ export function DriverDetail() {
     return (
       <div className="text-center py-8">
         <h2 className="text-xl font-semibold">Driver not found</h2>
-        <Button onClick={() => navigate("/drivers")} className="mt-4">
+        <Button onClick={() => navigate(backHref)} className="mt-4">
           Back to Drivers
         </Button>
       </div>
@@ -119,7 +125,7 @@ export function DriverDetail() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => navigate("/drivers")}>
+          <Button variant="ghost" onClick={() => navigate(backHref)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Drivers
           </Button>
@@ -147,10 +153,12 @@ export function DriverDetail() {
               Delete Driver
             </Button>
           )}
-          <Button onClick={() => navigate(`/drivers/${id}/edit`)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Driver
-          </Button>
+          {canEditDriver && (
+            <Button onClick={() => navigate(`/drivers/${id}/edit`)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Driver
+            </Button>
+          )}
         </div>
       </div>
 

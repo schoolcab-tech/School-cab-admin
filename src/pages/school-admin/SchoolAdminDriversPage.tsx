@@ -39,6 +39,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   Car,
   CheckCircle,
+  Eye,
   Loader2,
   Phone,
   Search,
@@ -46,6 +47,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function SchoolAdminDriversPage() {
   return (
@@ -57,6 +59,11 @@ export default function SchoolAdminDriversPage() {
 
 function Content() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const driversBase = location.pathname.startsWith("/moderator")
+    ? "/moderator/drivers"
+    : "/school-admin/drivers";
   const activeSchoolId = useActiveSchoolId();
   const { data: mySchoolAdmin } = useMySchoolAdmin();
   const [searchTerm, setSearchTerm] = useState("");
@@ -302,21 +309,31 @@ function Content() {
                         {formatRelative(d.last_seen_at)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {pendingRequestId ? (
-                          <Badge variant="outline" className="text-amber-700 border-amber-300">
-                            Delete requested
-                          </Badge>
-                        ) : (
+                        <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-destructive border-destructive/40 hover:bg-destructive/10"
-                            onClick={() => openRequestDialog(d)}
+                            onClick={() => navigate(`${driversBase}/${d.driver_id}`)}
                           >
-                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                            Request Delete
+                            <Eye className="h-3.5 w-3.5 mr-1.5" />
+                            Details
                           </Button>
-                        )}
+                          {pendingRequestId ? (
+                            <Badge variant="outline" className="text-amber-700 border-amber-300">
+                              Delete requested
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                              onClick={() => openRequestDialog(d)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                              Request Delete
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

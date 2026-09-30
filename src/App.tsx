@@ -565,6 +565,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/school-admin/drivers/:id"
+        element={
+          <RoleBasedRoute allowedRoles={["school_admin"]}>
+            <DriverDetail />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/school-admin/live-tracking"
         element={
           <RoleBasedRoute allowedRoles={["school_admin"]}>
@@ -811,6 +819,14 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["moderator"]}>
             <SchoolAdminDriversPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/drivers/:id"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <DriverDetail />
           </RoleBasedRoute>
         }
       />

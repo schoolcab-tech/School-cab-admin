@@ -573,7 +573,8 @@ function buildDriverOperationRow(
   trip: ActiveTripForTracking | null,
   stops: TripStop[],
   completedTripsToday: number,
-  livestreamEnabled = false
+  livestreamEnabled = false,
+  etaEnabled = true
 ): DriverOperationRow {
   const isLive = live?.is_live ?? v.is_live;
   const status = live?.status || v.status || "offline";
@@ -619,9 +620,9 @@ function buildDriverOperationRow(
     minutes_since_last_seen: minutesSince,
     speed: live?.speed ?? null,
     battery_level: live?.battery_level ?? v.battery_level,
-    eta_minutes: live?.eta_minutes ?? null,
-    eta_distance_km: live?.eta_distance_km ?? null,
-    student_etas: live?.student_etas ?? null,
+    eta_minutes: etaEnabled ? live?.eta_minutes ?? null : null,
+    eta_distance_km: etaEnabled ? live?.eta_distance_km ?? null : null,
+    student_etas: etaEnabled ? live?.student_etas ?? null : null,
     active_trip: trip,
     trip_type: trip?.trip_type ?? null,
     trip_progress: tripProgress,
@@ -639,7 +640,7 @@ function buildDriverOperationRow(
     last_pickup_at: lastPickupAt,
     next_student_name: next.name,
     next_stop_type: next.stop_type,
-    next_eta_minutes: next.eta_minutes,
+    next_eta_minutes: etaEnabled ? next.eta_minutes : null,
     completed_trips_today: completedTripsToday,
     stops,
   };
@@ -783,13 +784,15 @@ export async function getDriverOperationsOverview(opts?: {
     ),
   ];
   const livestreamBySchool = new Map<number, boolean>();
+  const etaBySchool = new Map<number, boolean>();
   if (schoolIds.length > 0) {
     const { data: schools } = await db
       .from("schools")
-      .select("school_id, livestream_enabled")
+      .select("school_id, livestream_enabled, eta_enabled")
       .in("school_id", schoolIds);
     for (const s of schools || []) {
       livestreamBySchool.set(s.school_id, !!s.livestream_enabled);
+      etaBySchool.set(s.school_id, s.eta_enabled !== false);
     }
   }
 
@@ -844,13 +847,17 @@ export async function getDriverOperationsOverview(opts?: {
     const livestreamEnabled = trip?.school_id
       ? livestreamBySchool.get(trip.school_id) ?? false
       : false;
+    const etaEnabled = trip?.school_id
+      ? etaBySchool.get(trip.school_id) ?? true
+      : true;
     return buildDriverOperationRow(
       v,
       live,
       trip,
       stops,
       completedTripsToday,
-      livestreamEnabled
+      livestreamEnabled,
+      etaEnabled
     );
   });
 }

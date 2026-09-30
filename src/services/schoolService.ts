@@ -33,6 +33,8 @@ interface SchoolDbRow {
   google_place_id?: string | null;
   livestream_enabled?: boolean;
   livestream_quality?: string;
+  eta_enabled?: boolean;
+  notifications_enabled?: boolean;
 }
 
 // Type for the database row when creating/updating a school
@@ -94,6 +96,8 @@ const mapDbToSchool = (row: SchoolDbRow): School => {
       row.livestream_quality === "480p" || row.livestream_quality === "360p"
         ? row.livestream_quality
         : "720p",
+    etaEnabled: row.eta_enabled !== false,
+    notificationsEnabled: row.notifications_enabled !== false,
     moderatorId: (row as any).moderator_id ?? null,
     moderatorName: (row as any).moderators?.contact_person ?? null,
   };
@@ -125,6 +129,10 @@ const mapSchoolToDb = (
     : {}),
   ...(school.livestreamQuality !== undefined
     ? { livestream_quality: school.livestreamQuality }
+    : {}),
+  ...(school.etaEnabled !== undefined ? { eta_enabled: school.etaEnabled } : {}),
+  ...(school.notificationsEnabled !== undefined
+    ? { notifications_enabled: school.notificationsEnabled }
     : {}),
   ...("school_id" in school ? { school_id: school.school_id } : {}),
 });

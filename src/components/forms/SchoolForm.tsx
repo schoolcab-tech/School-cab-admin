@@ -101,6 +101,8 @@ const formSchema = z.object({
   longitude: z.number().nullable().optional(),
   livestreamEnabled: z.boolean().default(false),
   livestreamQuality: z.enum(["720p", "480p", "360p"]).default("720p"),
+  etaEnabled: z.boolean().default(true),
+  notificationsEnabled: z.boolean().default(true),
 });
 
 // Use the OperatingHours type from the school types
@@ -147,6 +149,8 @@ export function SchoolForm({
         locality: address.locality,
         livestreamEnabled: initialData.livestreamEnabled ?? false,
         livestreamQuality: initialData.livestreamQuality ?? "720p",
+        etaEnabled: initialData.etaEnabled !== false,
+        notificationsEnabled: initialData.notificationsEnabled !== false,
         address: {
           street: address.street,
           city: address.city,
@@ -187,6 +191,8 @@ export function SchoolForm({
       additionalInfo: "",
       livestreamEnabled: false,
       livestreamQuality: "720p" as const,
+      etaEnabled: true,
+      notificationsEnabled: true,
     };
   };
 
@@ -229,6 +235,8 @@ export function SchoolForm({
           },
           livestreamEnabled: initialData.livestreamEnabled ?? false,
           livestreamQuality: initialData.livestreamQuality ?? "720p",
+          etaEnabled: initialData.etaEnabled !== false,
+          notificationsEnabled: initialData.notificationsEnabled !== false,
         }
       : {
           name: "",
@@ -260,6 +268,8 @@ export function SchoolForm({
           additionalInfo: "",
           livestreamEnabled: false,
           livestreamQuality: "720p" as const,
+          etaEnabled: true,
+          notificationsEnabled: true,
         },
   });
 
@@ -278,6 +288,8 @@ export function SchoolForm({
         googlePlaceId: googlePlaceId ?? null,
         livestreamEnabled: formData.livestreamEnabled,
         livestreamQuality: formData.livestreamQuality,
+        etaEnabled: formData.etaEnabled,
+        notificationsEnabled: formData.notificationsEnabled,
       };
 
       await onSubmit(submissionData as CreateSchoolInput | UpdateSchoolInput);
@@ -624,6 +636,52 @@ export function SchoolForm({
               googlePlaceId={googlePlaceId}
               onGooglePlaceIdChange={setGooglePlaceId}
               label="School Location"
+            />
+          </div>
+
+          <div className="space-y-4 md:col-span-2 rounded-lg border p-4 bg-muted/20">
+            <div>
+              <h3 className="text-lg font-medium">Parent app</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Control what parents of this school see during a trip. Schools
+                use the same ETA setting on live tracking.
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="etaEnabled"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-background">
+                  <div className="space-y-0.5 pr-4">
+                    <FormLabel>Show ETA</FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Arrival time on the parent map and in school live tracking
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="notificationsEnabled"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-background">
+                  <div className="space-y-0.5 pr-4">
+                    <FormLabel>Trip notifications</FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Cab approaching, pickup, drop-off, and arrival alerts to parents
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
             />
           </div>
 

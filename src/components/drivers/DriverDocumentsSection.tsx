@@ -105,7 +105,8 @@ export function DriverDocumentsSection({ driverId }: { driverId: number }) {
                 Documents
               </CardTitle>
               <CardDescription>
-                Driving license, RC, insurance and other compliance documents
+                Driving license, RC, insurance and other files. Parents with a
+                confirmed booking can view these in the app.
               </CardDescription>
             </div>
             {canWrite && (

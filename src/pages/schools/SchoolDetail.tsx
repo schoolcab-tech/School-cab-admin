@@ -274,6 +274,22 @@ export default function SchoolDetail() {
                     </p>
                   </div>
                   <div>
+                    <h3 className="text-sm font-medium">ETA</h3>
+                    <p className="text-muted-foreground">
+                      {school.etaEnabled
+                        ? 'Shown to parents and on school live tracking'
+                        : 'Hidden for this school'}
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium">Trip notifications</h3>
+                    <p className="text-muted-foreground">
+                      {school.notificationsEnabled
+                        ? 'Parents receive cab approaching, pickup, and drop alerts'
+                        : 'Parent trip alerts are off'}
+                    </p>
+                  </div>
+                  <div>
                     <h3 className="text-sm font-medium">Operating Hours</h3>
                     <div className="space-y-1 text-muted-foreground">
                       {Object.entries(school.operatingHours)
