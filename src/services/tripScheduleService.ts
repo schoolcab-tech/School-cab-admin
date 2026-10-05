@@ -1,4 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  bookingMatchesShiftDriver,
+  eveningDriverBookingOrFilter,
+  morningDriverBookingOrFilter,
+} from "@/utils/bookingShiftUtils";
 
 export interface TripSchedule {
   schedule_id: number;
@@ -118,6 +123,89 @@ export async function getSchoolsByIds(
 
   if (error) throw error;
   return data || [];
+}
+
+export interface ShiftRosterEntry {
+  student_id: number;
+  name: string;
+  class: string;
+  section: string;
+}
+
+export interface DriverShiftRoster {
+  morning: ShiftRosterEntry[];
+  evening: ShiftRosterEntry[];
+}
+
+/**
+ * Students assigned to this driver for morning pickup and evening drop at a school.
+ */
+export async function getDriverShiftRoster(
+  driverId: number,
+  schoolId: number
+): Promise<DriverShiftRoster> {
+  const shiftOr = `${morningDriverBookingOrFilter(driverId)},${eveningDriverBookingOrFilter(driverId)}`;
+
+  const { data: bookings, error } = await supabase
+    .from("bookings")
+    .select(
+      `
+      student_id,
+      driver_id,
+      morning_driver_id,
+      evening_driver_id,
+      students (
+        student_id,
+        name,
+        class,
+        section
+      )
+    `
+    )
+    .eq("school_id", schoolId)
+    .eq("status", "confirmed")
+    .eq("booking_type", "monthly")
+    .or(shiftOr);
+
+  if (error) throw error;
+
+  const morning: ShiftRosterEntry[] = [];
+  const evening: ShiftRosterEntry[] = [];
+
+  for (const row of bookings || []) {
+    const booking = row as {
+      student_id: number;
+      driver_id: number;
+      morning_driver_id?: number | null;
+      evening_driver_id?: number | null;
+      students: {
+        name: string;
+        class: string;
+        section: string;
+      } | null;
+    };
+    const student = booking.students;
+    if (!student) continue;
+
+    const entry: ShiftRosterEntry = {
+      student_id: booking.student_id,
+      name: student.name,
+      class: student.class,
+      section: student.section,
+    };
+
+    if (bookingMatchesShiftDriver(booking, driverId, "morning")) {
+      morning.push(entry);
+    }
+    if (bookingMatchesShiftDriver(booking, driverId, "evening")) {
+      evening.push(entry);
+    }
+  }
+
+  morning.sort((a, b) => a.name.localeCompare(b.name));
+  evening.sort((a, b) => a.name.localeCompare(b.name));
+
+  return { morning, evening };
 }
 
 /**

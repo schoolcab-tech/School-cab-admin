@@ -43,4 +43,20 @@ export interface Student {
     cab_number: string;
     vehicle_type: string;
   };
+  morning_driver?: {
+    driver_id: number;
+    name?: string;
+    phone?: string;
+    cab_number: string;
+    vehicle_type: string;
+  } | null;
+  evening_driver?: {
+    driver_id: number;
+    name?: string;
+    phone?: string;
+    cab_number: string;
+    vehicle_type: string;
+  } | null;
+  morning_driver_id?: number | null;
+  evening_driver_id?: number | null;
 }

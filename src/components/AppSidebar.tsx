@@ -18,6 +18,7 @@ import {
   History,
   DollarSign,
   Truck,
+  Zap,
   ClipboardList,
   Clock,
   FileText,
@@ -90,6 +91,12 @@ const navigationItems: NavItem[] = [
     title: "Routes & Areas",
     url: "/routes",
     icon: MapPin,
+    roles: ['admin', 'master_admin'],
+  },
+  {
+    title: "Charging Points",
+    url: "/charging-points",
+    icon: Zap,
     roles: ['admin', 'master_admin'],
   },
   {

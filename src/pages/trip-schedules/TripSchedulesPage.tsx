@@ -43,6 +43,8 @@ import {
   useUpsertTripSchedule,
 } from "@/hooks/useTripSchedules";
 import type { TripSchedule, TripStartAlert } from "@/services/tripScheduleService";
+import { getDriverShiftRoster } from "@/services/tripScheduleService";
+import { useSimpleQuery } from "@/hooks/useSimpleQuery";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   AlertTriangle,
@@ -458,6 +460,14 @@ function ScheduleDialog({
     selectedDriver?.schools_serving || []
   );
 
+  const driverIdNum = Number(selectedDriverId);
+  const schoolIdNum = Number(selectedSchoolId);
+  const { data: shiftRoster } = useSimpleQuery(
+    () => getDriverShiftRoster(driverIdNum, schoolIdNum),
+    [driverIdNum, schoolIdNum],
+    { enabled: !!driverIdNum && !!schoolIdNum }
+  );
+
   useEffect(() => {
     if (editingSchedule) {
       setSelectedDriverId(String(editingSchedule.driver_id));
@@ -591,6 +601,39 @@ function ScheduleDialog({
               </p>
             </div>
           </div>
+
+          {shiftRoster && (
+            <div className="grid grid-cols-2 gap-4 rounded-md border p-3 text-sm">
+              <div>
+                <p className="font-medium mb-1">Morning roster ({shiftRoster.morning.length})</p>
+                {shiftRoster.morning.length === 0 ? (
+                  <p className="text-muted-foreground text-xs">No students on morning shift</p>
+                ) : (
+                  <ul className="max-h-32 overflow-y-auto space-y-0.5 text-xs">
+                    {shiftRoster.morning.map((s) => (
+                      <li key={`m-${s.student_id}`}>
+                        {s.name} ({s.class}-{s.section})
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <p className="font-medium mb-1">Evening roster ({shiftRoster.evening.length})</p>
+                {shiftRoster.evening.length === 0 ? (
+                  <p className="text-muted-foreground text-xs">No students on evening shift</p>
+                ) : (
+                  <ul className="max-h-32 overflow-y-auto space-y-0.5 text-xs">
+                    {shiftRoster.evening.map((s) => (
+                      <li key={`e-${s.student_id}`}>
+                        {s.name} ({s.class}-{s.section})
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

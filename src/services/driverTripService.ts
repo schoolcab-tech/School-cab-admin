@@ -1,4 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  eveningDriverBookingOrFilter,
+  morningDriverBookingOrFilter,
+} from "@/utils/bookingShiftUtils";
+import {
+  deactivateConflictingTripAssignments,
+  type ServiceShift,
+} from "@/services/shiftRouteService";
 
 export interface DriverTrip {
   driver_trip_id: number;
@@ -6,6 +14,7 @@ export interface DriverTrip {
   school_id: number;
   trip_name: string;
   trip_order: number;
+  service_shift?: ServiceShift;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -93,15 +102,17 @@ export async function createDriverTrip(
   driverId: number,
   schoolId: number,
   tripName: string,
-  tripOrder: number
+  tripOrder: number,
+  serviceShift: ServiceShift = null
 ): Promise<DriverTrip> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("driver_trips")
     .insert({
       driver_id: driverId,
       school_id: schoolId,
       trip_name: tripName,
       trip_order: tripOrder,
+      service_shift: serviceShift,
       is_active: true,
     })
     .select()
@@ -116,9 +127,13 @@ export async function createDriverTrip(
  */
 export async function updateDriverTrip(
   driverTripId: number,
-  updates: { trip_name?: string; trip_order?: number }
+  updates: {
+    trip_name?: string;
+    trip_order?: number;
+    service_shift?: ServiceShift;
+  }
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("driver_trips")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("driver_trip_id", driverTripId);
@@ -208,6 +223,22 @@ export async function assignStudentToTrip(
   assignedBy: string
 ): Promise<void> {
   const db = supabase as any;
+
+  const { data: tripMeta, error: tripMetaError } = await db
+    .from("driver_trips")
+    .select("school_id, service_shift")
+    .eq("driver_trip_id", driverTripId)
+    .single();
+
+  if (tripMetaError) throw tripMetaError;
+
+  await deactivateConflictingTripAssignments(
+    studentId,
+    tripMeta.school_id,
+    driverTripId,
+    tripMeta.service_shift ?? null
+  );
+
   // Check if a row already exists (could be inactive from a previous removal)
   const { data: existing } = await db
     .from("driver_trip_students")
@@ -260,13 +291,17 @@ export async function getUnassignedStudents(
   driverId: number,
   schoolId: number
 ): Promise<UnassignedStudent[]> {
-  // Get all confirmed monthly bookings for this driver+school
+  const shiftOr = `${morningDriverBookingOrFilter(driverId)},${eveningDriverBookingOrFilter(driverId)}`;
+
   const { data: bookings, error: bookingsError } = await supabase
     .from("bookings")
     .select(
       `
       booking_id,
       student_id,
+      driver_id,
+      morning_driver_id,
+      evening_driver_id,
       students (
         student_id,
         name,
@@ -277,10 +312,10 @@ export async function getUnassignedStudents(
       )
     `
     )
-    .eq("driver_id", driverId)
     .eq("school_id", schoolId)
     .eq("status", "confirmed")
-    .eq("booking_type", "monthly");
+    .eq("booking_type", "monthly")
+    .or(shiftOr);
 
   if (bookingsError) throw bookingsError;
   if (!bookings || bookings.length === 0) return [];

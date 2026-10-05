@@ -138,6 +138,14 @@ export function StudentsTable({
   const drivers = fleetDrivers ?? allDrivers;
   const { mutate: updateStatus } = useUpdateStudentStatus();
   const { mutate: assignDriver } = useAssignDriver();
+
+  const routeOrderingBase = detailBasePath.startsWith("/school-admin")
+    ? "/school-admin/route-ordering"
+    : detailBasePath.startsWith("/moderator")
+      ? "/moderator/route-ordering"
+      : detailBasePath.startsWith("/sub-admin")
+        ? "/sub-admin/route-ordering"
+        : "/route-ordering";
   const deleteStudentMutation = useDeleteStudent();
 
   const handleDeleteStudent = async (student: Student) => {
@@ -297,48 +305,48 @@ export function StudentsTable({
   };
 
   // ── Single driver reassign ──
-  const openReassignDialog = (student: Student) => {
-    setIsBulkAssign(false);
-    setReassigningStudent(student);
-    setSelectedDriverId(
-      student.assigned_driver ? student.assigned_driver.driver_id.toString() : ""
-    );
-    setIsDialogOpen(true);
-  };
-
-  const handleDriverReassign = () => {
-    if (!reassigningStudent || !selectedDriverId) return;
-
-    assignDriver(
-      {
-        studentId: reassigningStudent.student_id,
-        driverId: parseInt(selectedDriverId),
-        schoolId: reassigningStudent.school_id,
-        adminUserId: user?.id,
-        adminRole: userRole || undefined,
-      },
-      {
-        onSuccess: () => {
-          setIsDialogOpen(false);
-          setReassigningStudent(null);
-          setSelectedDriverId("");
-          toast({
-            title: "Driver Reassigned",
-            description: `New driver assigned to ${reassigningStudent.name}`,
-          });
-          refetch();
-        },
-        onError: (err) => {
-          toast({
-            title: "Error",
-            description:
-              err instanceof Error ? err.message : "Failed to reassign driver",
-            variant: "destructive",
-          });
-        },
-      }
+  const openStudentRoutes = (student: Student) => {
+    const driverId =
+      student.morning_driver?.driver_id ??
+      student.assigned_driver?.driver_id;
+    if (!driverId) {
+      toast({
+        title: "No subscription driver",
+        description: "Assign a subscription driver first, then manage trips/routes.",
+        variant: "destructive",
+      });
+      return;
+    }
+    navigate(
+      `${routeOrderingBase}/${driverId}/${student.school_id}/trips`
     );
   };
+
+  const renderDriverSelect = (
+    id: string,
+    value: string,
+    onChange: (v: string) => void,
+    placeholder: string
+  ) => (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger id={id}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>Available Drivers</SelectLabel>
+          {drivers?.map((driver) => (
+            <SelectItem
+              key={`${id}-${driver.driver_id}`}
+              value={driver.driver_id.toString()}
+            >
+              {driver.name || "Unknown"} - {driver.cab_number} ({driver.vehicle_type})
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
 
   // ── Bulk driver assign ──
   const openBulkAssignDialog = () => {
@@ -661,17 +669,45 @@ export function StudentsTable({
                   <TableCell>
                     <div className="text-sm">
                       {student.assigned_driver ? (
-                        <div>
-                          <div className="font-medium">
-                            {student.assigned_driver.name}
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Car className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">
-                              {student.assigned_driver.cab_number}
-                            </span>
-                          </div>
-                        </div>
+                        (() => {
+                          const morningId =
+                            student.morning_driver?.driver_id ??
+                            student.assigned_driver.driver_id;
+                          const eveningId =
+                            student.evening_driver?.driver_id ??
+                            student.assigned_driver.driver_id;
+                          const split = morningId !== eveningId;
+                          return (
+                            <div>
+                              {split ? (
+                                <>
+                                  <div className="font-medium">
+                                    AM:{" "}
+                                    {student.morning_driver?.name ??
+                                      student.assigned_driver.name}
+                                  </div>
+                                  <div className="font-medium">
+                                    PM:{" "}
+                                    {student.evening_driver?.name ??
+                                      student.assigned_driver.name}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="font-medium">
+                                  {student.assigned_driver.name}
+                                </div>
+                              )}
+                              <div className="flex items-center space-x-1">
+                                <Car className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">
+                                  {split
+                                    ? "Split shifts"
+                                    : student.assigned_driver.cab_number}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()
                       ) : (
                         <Badge variant="outline">No Driver Assigned</Badge>
                       )}
@@ -742,8 +778,8 @@ export function StudentsTable({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => openReassignDialog(student)}
-                          title="Switch driver"
+                          onClick={() => openStudentRoutes(student)}
+                          title="Manage trips and routes (assign student to morning/evening trips; change trip driver there)"
                         >
                           <UserCog className="h-4 w-4" />
                         </Button>
@@ -783,42 +819,21 @@ export function StudentsTable({
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {isBulkAssign ? "Bulk Assign Driver" : "Reassign Driver"}
-            </DialogTitle>
+            <DialogTitle>Bulk assign subscription driver</DialogTitle>
             <DialogDescription>
-              {isBulkAssign
-                ? `Assign a driver to ${selectedIds.size} selected student${selectedIds.size > 1 ? "s" : ""}`
-                : reassigningStudent &&
-                  `Select a new driver for ${reassigningStudent.name}`}
+              {`Assign subscription driver to ${selectedIds.size} selected student${selectedIds.size > 1 ? "s" : ""}. For morning/evening routes, use Route Ordering → Manage Trips per driver.`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="driver">Select Driver</Label>
-              <Select
-                value={selectedDriverId}
-                onValueChange={setSelectedDriverId}
-              >
-                <SelectTrigger id="driver">
-                  <SelectValue placeholder="Select a driver" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Available Drivers</SelectLabel>
-                    {drivers?.map((driver) => (
-                      <SelectItem
-                        key={driver.driver_id}
-                        value={driver.driver_id.toString()}
-                      >
-                        {driver.name || "Unknown"} - {driver.cab_number} (
-                        {driver.vehicle_type})
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="driver">Subscription driver</Label>
+              {renderDriverSelect(
+                "driver",
+                selectedDriverId,
+                setSelectedDriverId,
+                "Select a driver"
+              )}
             </div>
           </div>
 
@@ -826,20 +841,16 @@ export function StudentsTable({
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            {isBulkAssign ? (
-              <Button onClick={handleBulkAssign} disabled={bulkAssigning || !selectedDriverId}>
-                {bulkAssigning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Assigning...
-                  </>
-                ) : (
-                  `Assign to ${selectedIds.size} Students`
-                )}
-              </Button>
-            ) : (
-              <Button onClick={handleDriverReassign}>Assign Driver</Button>
-            )}
+            <Button onClick={handleBulkAssign} disabled={bulkAssigning || !selectedDriverId}>
+              {bulkAssigning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                `Assign to ${selectedIds.size} Students`
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

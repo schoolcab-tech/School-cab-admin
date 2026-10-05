@@ -15,6 +15,8 @@ import {
   type TripStudent,
   type UnassignedStudent,
 } from "@/services/driverTripService";
+import { reassignTripDriver } from "@/services/shiftRouteService";
+import type { ServiceShift } from "@/services/shiftRouteService";
 import { useSimpleQuery } from "./useSimpleQuery";
 import { useSimpleMutation } from "./useSimpleMutation";
 
@@ -62,7 +64,27 @@ export const useCreateDriverTrip = () => {
       schoolId: number;
       tripName: string;
       tripOrder: number;
-    }) => createDriverTrip(driverId, schoolId, tripName, tripOrder),
+      serviceShift?: ServiceShift;
+    }) =>
+      createDriverTrip(
+        driverId,
+        schoolId,
+        tripName,
+        tripOrder,
+        serviceShift ?? null
+      ),
+  });
+};
+
+export const useReassignTripDriver = () => {
+  return useSimpleMutation({
+    mutationFn: ({
+      driverTripId,
+      newDriverId,
+    }: {
+      driverTripId: number;
+      newDriverId: number;
+    }) => reassignTripDriver(driverTripId, newDriverId),
   });
 };
 
@@ -73,7 +95,11 @@ export const useUpdateDriverTrip = () => {
       updates,
     }: {
       driverTripId: number;
-      updates: { trip_name?: string; trip_order?: number };
+      updates: {
+        trip_name?: string;
+        trip_order?: number;
+        service_shift?: ServiceShift;
+      };
     }) => updateDriverTrip(driverTripId, updates),
   });
 };

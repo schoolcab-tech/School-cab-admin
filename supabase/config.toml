@@ -1,1 +1,4 @@
 project_id = "wusekilmebfbikwspiic"
+
+[functions.nearest-charger]
+verify_jwt = false

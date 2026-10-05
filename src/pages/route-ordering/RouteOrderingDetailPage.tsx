@@ -106,7 +106,10 @@ export function RouteOrderingDetailContent({
   // Update local students when route data changes
   useEffect(() => {
     if (route?.students) {
-      const sorted = [...route.students].sort((a, b) => {
+      const shiftFiltered = route.students.filter((s) =>
+        orderType === "pickup" ? s.on_morning_shift !== false : s.on_evening_shift !== false
+      );
+      const sorted = [...shiftFiltered].sort((a, b) => {
         if (orderType === "pickup") {
           return a.pickup_order - b.pickup_order;
         }

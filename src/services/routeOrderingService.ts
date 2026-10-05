@@ -1,4 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  bookingMatchesShiftDriver,
+  eveningDriverBookingOrFilter,
+  morningDriverBookingOrFilter,
+  resolveEveningDriverId,
+  resolveMorningDriverId,
+} from "@/utils/bookingShiftUtils";
+import { getStudentIdsForDriverShift } from "@/services/shiftRouteService";
 
 export interface StudentRouteOrder {
   route_order_id?: number;
@@ -15,6 +23,8 @@ export interface StudentRouteOrder {
   pickup_order: number;
   drop_order: number;
   is_active: boolean;
+  on_morning_shift?: boolean;
+  on_evening_shift?: boolean;
 }
 
 export interface DriverSchoolRoute {
@@ -145,6 +155,8 @@ export async function getAllDriverSchoolRoutes(options?: {
     .select(
       `
       driver_id,
+      morning_driver_id,
+      evening_driver_id,
       school_id,
       drivers!inner (
         driver_id,
@@ -163,10 +175,6 @@ export async function getAllDriverSchoolRoutes(options?: {
     query = query.eq("school_id", options.schoolId);
   }
 
-  if (options?.driverIds != null) {
-    query = query.in("driver_id", options.driverIds);
-  }
-
   const { data, error } = await query;
 
   // Fleet owners may not have bookings RLS access — fall back to schools_serving
@@ -176,24 +184,68 @@ export async function getAllDriverSchoolRoutes(options?: {
 
   const routeMap = new Map<string, DriverSchoolRouteSummary>();
 
+  const extraDriverIds = new Set<number>();
   for (const booking of data || []) {
-    const driver = booking.drivers as unknown as { driver_id: number; name: string };
-    const school = booking.schools as unknown as { school_id: number; name: string };
-    upsertRouteSummary(
-      routeMap,
-      booking.driver_id,
-      booking.school_id,
-      driver.name || "Unknown Driver",
-      school.name || "Unknown School",
-      1
-    );
+    const b = booking as {
+      driver_id: number;
+      morning_driver_id?: number | null;
+      evening_driver_id?: number | null;
+      school_id: number;
+      drivers: { driver_id: number; name: string };
+      schools: { school_id: number; name: string };
+    };
+    const morningId = resolveMorningDriverId(b);
+    const eveningId = resolveEveningDriverId(b);
+    if (b.morning_driver_id != null) extraDriverIds.add(b.morning_driver_id);
+    if (b.evening_driver_id != null) extraDriverIds.add(b.evening_driver_id);
+
+    const school = b.schools;
+    const billedName = b.drivers?.name || "Unknown Driver";
+
+    const addForDriver = (driverId: number, driverName: string) => {
+      upsertRouteSummary(
+        routeMap,
+        driverId,
+        b.school_id,
+        driverName,
+        school.name || "Unknown School",
+        1
+      );
+    };
+
+    addForDriver(morningId, morningId === b.driver_id ? billedName : `Driver #${morningId}`);
+    if (eveningId !== morningId) {
+      addForDriver(
+        eveningId,
+        eveningId === b.driver_id ? billedName : `Driver #${eveningId}`
+      );
+    }
   }
+
+  if (extraDriverIds.size > 0) {
+    const { data: extraDrivers } = await supabase
+      .from("drivers")
+      .select("driver_id, name")
+      .in("driver_id", Array.from(extraDriverIds));
+    const nameMap = new Map(
+      (extraDrivers || []).map((d) => [d.driver_id, d.name || "Unknown Driver"])
+    );
+    for (const route of routeMap.values()) {
+      const resolved = nameMap.get(route.driver_id);
+      if (resolved) route.driver_name = resolved;
+    }
+  }
+
+  let routes = Array.from(routeMap.values());
 
   if (options?.driverIds != null) {
+    const allowed = new Set(options.driverIds);
+    routes = routes.filter((r) => allowed.has(r.driver_id));
     await mergeFleetDriverRoutes(routeMap, options.driverIds);
+    routes = Array.from(routeMap.values()).filter((r) =>
+      allowed.has(r.driver_id)
+    );
   }
-
-  const routes = Array.from(routeMap.values());
 
   // Check for custom orders
   for (const route of routes) {
@@ -235,31 +287,79 @@ export async function getDriverSchoolStudents(
 
   if (schoolError) throw schoolError;
 
-  // Get students from bookings (confirmed monthly subscriptions)
-  const { data: bookings, error: bookingsError } = await supabase
-    .from("bookings")
-    .select(
-      `
-      booking_id,
-      student_id,
-      students (
+  const [morningTripIds, eveningTripIds] = await Promise.all([
+    getStudentIdsForDriverShift(driverId, schoolId, "morning"),
+    getStudentIdsForDriverShift(driverId, schoolId, "evening"),
+  ]);
+  const tripStudentIds = [
+    ...new Set([...morningTripIds, ...eveningTripIds]),
+  ];
+
+  let bookings: any[] | null = null;
+  let bookingsError: any = null;
+
+  if (tripStudentIds.length > 0) {
+    const result = await supabase
+      .from("bookings")
+      .select(
+        `
+        booking_id,
         student_id,
-        name,
-        class,
-        section,
-        pickup_address,
-        pickup_latitude,
-        pickup_longitude,
-        drop_address,
-        drop_latitude,
-        drop_longitude
+        driver_id,
+        morning_driver_id,
+        evening_driver_id,
+        students (
+          student_id,
+          name,
+          class,
+          section,
+          pickup_address,
+          pickup_latitude,
+          pickup_longitude,
+          drop_address,
+          drop_latitude,
+          drop_longitude
+        )
+      `
       )
-    `
-    )
-    .eq("driver_id", driverId)
-    .eq("school_id", schoolId)
-    .eq("status", "confirmed")
-    .eq("booking_type", "monthly");
+      .eq("school_id", schoolId)
+      .eq("status", "confirmed")
+      .eq("booking_type", "monthly")
+      .in("student_id", tripStudentIds);
+    bookings = result.data;
+    bookingsError = result.error;
+  } else {
+    const shiftOr = `${morningDriverBookingOrFilter(driverId)},${eveningDriverBookingOrFilter(driverId)}`;
+    const result = await supabase
+      .from("bookings")
+      .select(
+        `
+        booking_id,
+        student_id,
+        driver_id,
+        morning_driver_id,
+        evening_driver_id,
+        students (
+          student_id,
+          name,
+          class,
+          section,
+          pickup_address,
+          pickup_latitude,
+          pickup_longitude,
+          drop_address,
+          drop_latitude,
+          drop_longitude
+        )
+      `
+      )
+      .eq("school_id", schoolId)
+      .eq("status", "confirmed")
+      .eq("booking_type", "monthly")
+      .or(shiftOr);
+    bookings = result.data;
+    bookingsError = result.error;
+  }
 
   if (bookingsError) throw bookingsError;
 
@@ -279,6 +379,12 @@ export async function getDriverSchoolStudents(
   );
 
   const students: StudentRouteOrder[] = (bookings || []).map((b, index) => {
+    const bookingRow = b as {
+      student_id: number;
+      driver_id: number;
+      morning_driver_id?: number | null;
+      evening_driver_id?: number | null;
+    };
     const existingOrder = orderMap.get(b.student_id);
     const student = b.students as unknown as {
       student_id: number;
@@ -293,9 +399,18 @@ export async function getDriverSchoolStudents(
       drop_longitude: number;
     };
 
+    const onMorningTrip = morningTripIds.includes(b.student_id);
+    const onEveningTrip = eveningTripIds.includes(b.student_id);
+
     return {
       route_order_id: existingOrder?.route_order_id,
       student_id: b.student_id,
+      on_morning_shift:
+        onMorningTrip ||
+        bookingMatchesShiftDriver(bookingRow, driverId, "morning"),
+      on_evening_shift:
+        onEveningTrip ||
+        bookingMatchesShiftDriver(bookingRow, driverId, "evening"),
       student_name: student?.name || "Unknown",
       student_class: student?.class,
       student_section: student?.section,

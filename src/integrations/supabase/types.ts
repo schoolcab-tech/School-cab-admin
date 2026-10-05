@@ -200,6 +200,8 @@ export type Database = {
           drop_pincode: string
           drop_time: string
           duration_days: number | null
+          evening_driver_id: number | null
+          morning_driver_id: number | null
           duration_end_date: string | null
           duration_start_date: string | null
           fare: number
@@ -226,8 +228,10 @@ export type Database = {
           duration_days?: number | null
           duration_end_date?: string | null
           duration_start_date?: string | null
+          evening_driver_id?: number | null
           fare: number
           last_cycle_end_date?: string | null
+          morning_driver_id?: number | null
           pickup_address: string
           pickup_pincode: string
           pickup_time: string
@@ -248,6 +252,8 @@ export type Database = {
           drop_pincode?: string
           drop_time?: string
           duration_days?: number | null
+          evening_driver_id?: number | null
+          morning_driver_id?: number | null
           duration_end_date?: string | null
           duration_start_date?: string | null
           fare?: number
@@ -847,6 +853,78 @@ export type Database = {
             referencedColumns: ["school_id"]
           },
         ]
+      }
+      ev_charging_points: {
+        Row: {
+          access: string | null
+          active: boolean
+          address: string | null
+          city: string | null
+          connectors: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          name: string
+          operator: string | null
+          power_kw: number | null
+          service_areas: string[]
+          short_address: string | null
+          site_key: string
+          site_phrases: string[]
+          site_sectors: string[]
+          source_id: string | null
+          spoken_name: string
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          access?: string | null
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          connectors?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          operator?: string | null
+          power_kw?: number | null
+          service_areas?: string[]
+          short_address?: string | null
+          site_key: string
+          site_phrases?: string[]
+          site_sectors?: string[]
+          source_id?: string | null
+          spoken_name: string
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access?: string | null
+          active?: boolean
+          address?: string | null
+          city?: string | null
+          connectors?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          operator?: string | null
+          power_kw?: number | null
+          service_areas?: string[]
+          short_address?: string | null
+          site_key?: string
+          site_phrases?: string[]
+          site_sectors?: string[]
+          source_id?: string | null
+          spoken_name?: string
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       fleet_cab_mappings: {
         Row: {

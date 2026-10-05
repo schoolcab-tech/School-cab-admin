@@ -30,7 +30,17 @@ import {
   useAutoAssignStudents,
   useOptimizeTripRoute,
   useReorderTripStudents,
+  useReassignTripDriver,
 } from "@/hooks/useDriverTrips";
+import { useDrivers } from "@/hooks/useDrivers";
+import type { ServiceShift } from "@/services/shiftRouteService";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context"
 import { useActiveSchoolId } from "@/hooks/useActiveSchoolId";
 import {
@@ -117,7 +127,12 @@ export function DriverTripManagementContent({
   const removeStudent = useRemoveStudent();
   const autoAssign = useAutoAssignStudents();
   const optimizeRoute = useOptimizeTripRoute();
+  const reassignTripDriver = useReassignTripDriver();
+  const { data: allDrivers = [] } = useDrivers();
 
+  const [newTripShift, setNewTripShift] = useState<"full" | "morning" | "evening">(
+    "full"
+  );
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedTripForAssign, setSelectedTripForAssign] = useState<number | null>(null);
   const [editingTripId, setEditingTripId] = useState<number | null>(null);
@@ -153,12 +168,25 @@ export function DriverTripManagementContent({
     const nextOrder = trips.length > 0
       ? Math.max(...trips.map((t) => t.trip_order)) + 1
       : 1;
+    const serviceShift: ServiceShift =
+      newTripShift === "full"
+        ? null
+        : newTripShift === "morning"
+          ? "morning"
+          : "evening";
+    const shiftLabel =
+      newTripShift === "morning"
+        ? "Morning"
+        : newTripShift === "evening"
+          ? "Evening"
+          : "Trip";
     try {
       await createTrip.mutateAsync({
         driverId,
         schoolId,
-        tripName: `Trip ${nextOrder}`,
+        tripName: `${shiftLabel} ${nextOrder}`,
         tripOrder: nextOrder,
+        serviceShift,
       });
       toast.success("Trip created");
       await refetchAll();
@@ -322,7 +350,22 @@ export function DriverTripManagementContent({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          <Select
+            value={newTripShift}
+            onValueChange={(v) =>
+              setNewTripShift(v as "full" | "morning" | "evening")
+            }
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Route type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="full">Full day (pickup + drop)</SelectItem>
+              <SelectItem value="morning">Morning pickup route</SelectItem>
+              <SelectItem value="evening">Evening drop route</SelectItem>
+            </SelectContent>
+          </Select>
           <Button onClick={handleCreateTrip} disabled={createTrip.isPending}>
             {createTrip.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -384,6 +427,20 @@ export function DriverTripManagementContent({
               }
               onOptimize={(orderType) => handleOptimizeTrip(trip.driver_trip_id, trip.trip_name, orderType)}
               isOptimizing={optimizeRoute.isPending}
+              drivers={allDrivers}
+              onReassignDriver={async (newDriverId) => {
+                if (newDriverId === driverId) return;
+                try {
+                  await reassignTripDriver.mutateAsync({
+                    driverTripId: trip.driver_trip_id,
+                    newDriverId,
+                  });
+                  toast.success("Route moved to new driver");
+                  navigate(`${listBasePath}/${newDriverId}/${schoolId}/trips`);
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to reassign route driver");
+                }
+              }}
             />
           ))}
 
@@ -581,9 +638,13 @@ function TripCard({
   onRemoveStudent,
   onOptimize,
   isOptimizing,
+  drivers,
+  onReassignDriver,
 }: {
   trip: DriverTrip;
   cabCapacity: number;
+  drivers: Array<{ driver_id: number; name?: string | null }>;
+  onReassignDriver: (newDriverId: number) => void;
   editingTripId: number | null;
   editingName: string;
   onStartRename: (trip: DriverTrip) => void;
@@ -714,6 +775,15 @@ function TripCard({
             >
               {localStudents.length}/{cabCapacity} students
             </Badge>
+            {trip.service_shift === "morning" && (
+              <Badge variant="outline">Morning route</Badge>
+            )}
+            {trip.service_shift === "evening" && (
+              <Badge variant="outline">Evening route</Badge>
+            )}
+            {!trip.service_shift && (
+              <Badge variant="outline">Full day</Badge>
+            )}
             {isOverCapacity && (
               <Badge variant="destructive">Over capacity!</Badge>
             )}
@@ -752,6 +822,20 @@ function TripCard({
               )}
               Optimize
             </Button>
+            <Select
+              onValueChange={(v) => onReassignDriver(Number(v))}
+            >
+              <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectValue placeholder="Change route driver" />
+              </SelectTrigger>
+              <SelectContent>
+                {drivers.map((d) => (
+                  <SelectItem key={d.driver_id} value={String(d.driver_id)}>
+                    {d.name || `Driver ${d.driver_id}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm" onClick={onOpenAssign}>
               <UserPlus className="mr-1 h-4 w-4" />
               Add Students

@@ -113,6 +113,7 @@ import SchoolAdminProfilePage from "./pages/school-admin/SchoolAdminProfilePage"
 
 // Vehicles / Reports / Performance
 import VehiclesPage, { SchoolAdminVehiclesPage, SubAdminVehiclesPage } from "./pages/vehicles/VehiclesPage";
+import ChargingPointsPage from "./pages/charging-points/ChargingPointsPage";
 import ReportsPage, { SchoolAdminReportsPage } from "./pages/reports/ReportsPage";
 import PerformancePage, { SchoolAdminPerformancePage } from "./pages/performance/PerformancePage";
 
@@ -527,6 +528,14 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
             <VehiclesPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/charging-points"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
+            <ChargingPointsPage />
           </RoleBasedRoute>
         }
       />
