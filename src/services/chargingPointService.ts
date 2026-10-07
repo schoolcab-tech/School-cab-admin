@@ -108,6 +108,32 @@ function uniquePhrases(values: string[]) {
   return result;
 }
 
+function flattenAreas(values: string[]) {
+  const parts: string[] = [];
+  for (const value of values) {
+    for (const part of String(value).split(/[,;\n]+/)) parts.push(part);
+  }
+  return uniquePhrases(parts);
+}
+
+function areaKey(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function canonicalAreaKey(value: string) {
+  return areaKey(value)
+    .replace(/\bgurugaon\b/g, "gurugram")
+    .replace(/\bgurgaon\b/g, "gurugram")
+    .replace(/\bsec\b/g, "sector")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .sort()
+    .join(" ");
+}
+
 export function generatedPhrases(input: {
   spoken: string;
   shortAddress: string;
@@ -166,7 +192,7 @@ export function toChargingPointWrite(
   const state = blank(input.state);
   const sectors = sectorsFrom(name, spoken, address);
   const phrases = uniquePhrases(input.site_phrases);
-  const serviceAreas = uniquePhrases(input.service_areas);
+  const serviceAreas = flattenAreas(input.service_areas);
   const latitude = parseCoordinate(input.latitude, 90, "Latitude");
   const longitude = parseCoordinate(input.longitude, 180, "Longitude");
   if ((latitude == null) !== (longitude == null)) {
@@ -233,13 +259,30 @@ export async function updateChargingPoint(
   return data;
 }
 
+async function claimServiceAreas(ownerId: string, areas: string[]) {
+  const claimed = new Set(areas.flatMap((area) => [areaKey(area), canonicalAreaKey(area)]).filter(Boolean));
+  if (!claimed.size) return;
+  const points = await listChargingPoints();
+  await Promise.all(points.map(async (point) => {
+    if (point.id === ownerId) return;
+    const current = point.service_areas ?? [];
+    const next = current.filter((area) => !claimed.has(areaKey(area)) && !claimed.has(canonicalAreaKey(area)));
+    if (next.length === current.length) return;
+    await updateChargingPoint(point.id, { service_areas: next });
+  }));
+}
+
 export async function saveChargingPoint(
   input: ChargingPointForm,
   existing?: ChargingPoint | null,
 ): Promise<ChargingPoint> {
-  const row = toChargingPointWrite(input, existing);
-  if (!existing) return createChargingPoint(input);
-  return updateChargingPoint(existing.id, row);
+  const saved = existing
+    ? await updateChargingPoint(existing.id, toChargingPointWrite(input, existing))
+    : await createChargingPoint(input);
+  const previous = new Set((existing?.service_areas ?? []).map(areaKey));
+  const claimed = flattenAreas(saved.service_areas ?? []).filter((area) => !previous.has(areaKey(area)));
+  if (claimed.length) await claimServiceAreas(saved.id, claimed);
+  return saved;
 }
 
 export async function deleteChargingPoint(id: string): Promise<void> {
@@ -261,24 +304,25 @@ export async function syncLocationCoverage(args: {
 
   const selected = new Set(args.chargerIds);
   const previous = args.previousName;
+  const nameKey = areaKey(name);
+  const previousKey = previous ? areaKey(previous) : "";
+  const nameCanon = canonicalAreaKey(name);
+  const previousCanon = previous ? canonicalAreaKey(previous) : "";
+  const drop = new Set([nameKey, previousKey, nameCanon, previousCanon].filter(Boolean));
   const updates: Promise<ChargingPoint>[] = [];
 
   for (const point of args.points) {
     const current = point.service_areas ?? [];
-    let next = [...current];
+    let next = flattenAreas(current).map((area) => (
+      previousKey && (areaKey(area) === previousKey || canonicalAreaKey(area) === previousCanon) ? name : area
+    ));
 
-    if (previous) {
-      next = next.map((area) => (area === previous ? name : area));
-      if (!selected.has(point.id)) {
-        next = next.filter((area) => area !== name && area !== previous);
+    if (selected.has(point.id)) {
+      if (!next.some((area) => areaKey(area) === nameKey || canonicalAreaKey(area) === nameCanon)) {
+        next = [...next, name];
       }
-    }
-
-    if (selected.has(point.id) && !next.some((area) => area.toLowerCase() === name.toLowerCase())) {
-      next = [...next, name];
-    }
-    if (!selected.has(point.id) && !previous) {
-      next = next.filter((area) => area.toLowerCase() !== name.toLowerCase());
+    } else {
+      next = next.filter((area) => !drop.has(areaKey(area)) && !drop.has(canonicalAreaKey(area)));
     }
 
     next = uniquePhrases(next);

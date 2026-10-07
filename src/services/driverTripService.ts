@@ -1,8 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import {
-  eveningDriverBookingOrFilter,
-  morningDriverBookingOrFilter,
-} from "@/utils/bookingShiftUtils";
+import { getStudentIdsForDriverShift } from "@/services/shiftRouteService";
 import {
   deactivateConflictingTripAssignments,
   type ServiceShift,
@@ -291,17 +288,24 @@ export async function getUnassignedStudents(
   driverId: number,
   schoolId: number
 ): Promise<UnassignedStudent[]> {
-  const shiftOr = `${morningDriverBookingOrFilter(driverId)},${eveningDriverBookingOrFilter(driverId)}`;
+  let rosterStudentIds: number[] = [];
+  try {
+    const [morningIds, eveningIds] = await Promise.all([
+      getStudentIdsForDriverShift(driverId, schoolId, "morning"),
+      getStudentIdsForDriverShift(driverId, schoolId, "evening"),
+    ]);
+    rosterStudentIds = [...new Set([...morningIds, ...eveningIds])];
+  } catch {
+    rosterStudentIds = [];
+  }
 
-  const { data: bookings, error: bookingsError } = await supabase
+  let bookingsQuery = supabase
     .from("bookings")
     .select(
       `
       booking_id,
       student_id,
       driver_id,
-      morning_driver_id,
-      evening_driver_id,
       students (
         student_id,
         name,
@@ -314,8 +318,15 @@ export async function getUnassignedStudents(
     )
     .eq("school_id", schoolId)
     .eq("status", "confirmed")
-    .eq("booking_type", "monthly")
-    .or(shiftOr);
+    .eq("booking_type", "monthly");
+
+  if (rosterStudentIds.length > 0) {
+    bookingsQuery = bookingsQuery.in("student_id", rosterStudentIds);
+  } else {
+    bookingsQuery = bookingsQuery.eq("driver_id", driverId);
+  }
+
+  const { data: bookings, error: bookingsError } = await bookingsQuery;
 
   if (bookingsError) throw bookingsError;
   if (!bookings || bookings.length === 0) return [];

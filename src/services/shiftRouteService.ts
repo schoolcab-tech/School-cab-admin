@@ -104,13 +104,30 @@ export async function getStudentIdsForDriverShift(
       ? "service_shift.is.null,service_shift.eq.morning"
       : "service_shift.is.null,service_shift.eq.evening";
 
-  const { data: tripRows, error } = await db
+  let tripRows: { driver_trip_id: number }[] | null = null;
+  let error: { message: string } | null = null;
+
+  const withShift = await db
     .from("driver_trips")
     .select("driver_trip_id")
     .eq("driver_id", driverId)
     .eq("school_id", schoolId)
     .eq("is_active", true)
     .or(shiftFilter);
+
+  if (withShift.error?.message?.includes("service_shift")) {
+    const legacy = await db
+      .from("driver_trips")
+      .select("driver_trip_id")
+      .eq("driver_id", driverId)
+      .eq("school_id", schoolId)
+      .eq("is_active", true);
+    tripRows = legacy.data;
+    error = legacy.error;
+  } else {
+    tripRows = withShift.data;
+    error = withShift.error;
+  }
 
   if (error) throw error;
   const tripIds = (tripRows || []).map((t: { driver_trip_id: number }) => t.driver_trip_id);

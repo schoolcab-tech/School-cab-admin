@@ -454,9 +454,12 @@ export default function ChargingPointsPage() {
     const groups = new Map<string, LocationGroup>();
     for (const point of points) {
       for (const area of point.service_areas ?? []) {
-        const existing = groups.get(area);
-        if (existing) existing.chargers.push(point);
-        else groups.set(area, { name: area, chargers: [point] });
+        const names = area.split(/[,;\n]+/).map((part) => part.replace(/\s+/g, " ").trim()).filter((part) => part.length > 1);
+        for (const name of names.length ? names : [area]) {
+          const existing = groups.get(name);
+          if (existing) existing.chargers.push(point);
+          else groups.set(name, { name, chargers: [point] });
+        }
       }
     }
     return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));

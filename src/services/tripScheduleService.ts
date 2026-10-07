@@ -1,9 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
   bookingMatchesShiftDriver,
-  eveningDriverBookingOrFilter,
-  morningDriverBookingOrFilter,
 } from "@/utils/bookingShiftUtils";
+import {
+  getStudentIdsForDriverShift,
+} from "@/services/shiftRouteService";
 
 export interface TripSchedule {
   schedule_id: number;
@@ -144,7 +145,52 @@ export async function getDriverShiftRoster(
   driverId: number,
   schoolId: number
 ): Promise<DriverShiftRoster> {
-  const shiftOr = `${morningDriverBookingOrFilter(driverId)},${eveningDriverBookingOrFilter(driverId)}`;
+  let morningIds: number[] = [];
+  let eveningIds: number[] = [];
+  try {
+    [morningIds, eveningIds] = await Promise.all([
+      getStudentIdsForDriverShift(driverId, schoolId, "morning"),
+      getStudentIdsForDriverShift(driverId, schoolId, "evening"),
+    ]);
+  } catch {
+    morningIds = [];
+    eveningIds = [];
+  }
+
+  const allIds = [...new Set([...morningIds, ...eveningIds])];
+  if (allIds.length === 0) {
+    const { data: fallbackBookings, error } = await supabase
+      .from("bookings")
+      .select(
+        `
+        student_id,
+        driver_id,
+        students ( name, class, section )
+      `
+      )
+      .eq("school_id", schoolId)
+      .eq("status", "confirmed")
+      .eq("booking_type", "monthly")
+      .eq("driver_id", driverId);
+
+    if (error) throw error;
+
+    const entries: ShiftRosterEntry[] = (fallbackBookings || [])
+      .map((row: any) => {
+        const s = row.students;
+        if (!s) return null;
+        return {
+          student_id: row.student_id,
+          name: s.name,
+          class: s.class,
+          section: s.section,
+        };
+      })
+      .filter(Boolean) as ShiftRosterEntry[];
+
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    return { morning: entries, evening: entries };
+  }
 
   const { data: bookings, error } = await supabase
     .from("bookings")
@@ -152,23 +198,18 @@ export async function getDriverShiftRoster(
       `
       student_id,
       driver_id,
-      morning_driver_id,
-      evening_driver_id,
-      students (
-        student_id,
-        name,
-        class,
-        section
-      )
+      students ( name, class, section )
     `
     )
     .eq("school_id", schoolId)
     .eq("status", "confirmed")
     .eq("booking_type", "monthly")
-    .or(shiftOr);
+    .in("student_id", allIds);
 
   if (error) throw error;
 
+  const morningSet = new Set(morningIds);
+  const eveningSet = new Set(eveningIds);
   const morning: ShiftRosterEntry[] = [];
   const evening: ShiftRosterEntry[] = [];
 
@@ -176,13 +217,7 @@ export async function getDriverShiftRoster(
     const booking = row as {
       student_id: number;
       driver_id: number;
-      morning_driver_id?: number | null;
-      evening_driver_id?: number | null;
-      students: {
-        name: string;
-        class: string;
-        section: string;
-      } | null;
+      students: { name: string; class: string; section: string } | null;
     };
     const student = booking.students;
     if (!student) continue;
@@ -194,10 +229,16 @@ export async function getDriverShiftRoster(
       section: student.section,
     };
 
-    if (bookingMatchesShiftDriver(booking, driverId, "morning")) {
+    if (
+      morningSet.has(booking.student_id) ||
+      bookingMatchesShiftDriver(booking, driverId, "morning")
+    ) {
       morning.push(entry);
     }
-    if (bookingMatchesShiftDriver(booking, driverId, "evening")) {
+    if (
+      eveningSet.has(booking.student_id) ||
+      bookingMatchesShiftDriver(booking, driverId, "evening")
+    ) {
       evening.push(entry);
     }
   }

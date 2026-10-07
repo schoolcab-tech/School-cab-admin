@@ -5,7 +5,10 @@ import {
   resolveEveningDriverId,
   resolveMorningDriverId,
 } from "@/utils/bookingShiftUtils";
-import { resolveShiftDriversForStudent } from "@/services/shiftRouteService";
+import {
+  getStudentIdsForDriverShift,
+  resolveShiftDriversForStudent,
+} from "@/services/shiftRouteService";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -80,8 +83,6 @@ export async function assignDriverToStudent(
       .from("bookings")
       .update({
         driver_id: driverId,
-        morning_driver_id: null,
-        evening_driver_id: null,
         updated_at: new Date().toISOString() // Explicitly update timestamp
       })
       .eq("booking_id", bookingId)
@@ -368,7 +369,7 @@ export async function assignShiftDrivers(
 ) {
   const { data: existingBooking, error: fetchError } = await supabase
     .from("bookings")
-    .select("booking_id, driver_id, morning_driver_id, evening_driver_id")
+    .select("booking_id, driver_id")
     .eq("student_id", studentId)
     .eq("status", "confirmed")
     .order("updated_at", { ascending: false })
@@ -382,28 +383,8 @@ export async function assignShiftDrivers(
   }
 
   const booking = existingBooking[0];
-  const billedDriverId = booking.driver_id;
-  const morningStored =
-    morningDriverId === billedDriverId ? null : morningDriverId;
-  const eveningStored =
-    eveningDriverId === billedDriverId ? null : eveningDriverId;
-
-  const { data: updated, error: updateError } = await supabase
-    .from("bookings")
-    .update({
-      morning_driver_id: morningStored,
-      evening_driver_id: eveningStored,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("booking_id", booking.booking_id)
-    .select();
-
-  if (updateError) {
-    throw new Error(`Error updating shift drivers: ${updateError.message}`);
-  }
-
-  const resolvedMorning = morningStored ?? billedDriverId;
-  const resolvedEvening = eveningStored ?? billedDriverId;
+  const resolvedMorning = morningDriverId;
+  const resolvedEvening = eveningDriverId;
   const tripDrivers = [...new Set([resolvedMorning, resolvedEvening])];
 
   try {
@@ -425,15 +406,9 @@ export async function assignShiftDrivers(
         "override_data",
         "student_shift_drivers",
         booking.booking_id,
+        { student_id: studentId, booking_id: booking.booking_id },
         {
           student_id: studentId,
-          morning_driver_id: booking.morning_driver_id,
-          evening_driver_id: booking.evening_driver_id,
-        },
-        {
-          student_id: studentId,
-          morning_driver_id: morningStored,
-          evening_driver_id: eveningStored,
           resolved_morning_driver_id: resolvedMorning,
           resolved_evening_driver_id: resolvedEvening,
         },
@@ -444,7 +419,7 @@ export async function assignShiftDrivers(
     }
   }
 
-  return updated?.[0];
+  return { booking_id: booking.booking_id, driver_id: booking.driver_id };
 }
 
 /**
@@ -588,7 +563,7 @@ export async function getStudents(options?: {
 
     const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
-      .select("student_id, driver_id, morning_driver_id, evening_driver_id")
+      .select("student_id, driver_id, school_id")
       .eq("status", "confirmed")
       .eq("booking_type", "monthly");
 
@@ -597,21 +572,38 @@ export async function getStudents(options?: {
     }
 
     const driverIdSet = new Set(options.driverIds);
-    studentIdsFilter = [
-      ...new Set(
-        (bookings || [])
-          .filter((b) => {
-            const morning = b.morning_driver_id ?? b.driver_id;
-            const evening = b.evening_driver_id ?? b.driver_id;
-            return (
-              driverIdSet.has(b.driver_id) ||
-              driverIdSet.has(morning) ||
-              driverIdSet.has(evening)
-            );
-          })
-          .map((b) => b.student_id)
-      ),
-    ];
+    const fleetStudentIds = new Set<number>();
+
+    for (const b of bookings || []) {
+      if (driverIdSet.has(b.driver_id)) {
+        fleetStudentIds.add(b.student_id);
+      }
+    }
+
+    for (const driverId of options.driverIds) {
+      const schools = [
+        ...new Set(
+          (bookings || [])
+            .filter((b) => b.driver_id === driverId)
+            .map((b) => b.school_id)
+        ),
+      ];
+      for (const schoolId of schools) {
+        try {
+          const [morningIds, eveningIds] = await Promise.all([
+            getStudentIdsForDriverShift(driverId, schoolId, "morning"),
+            getStudentIdsForDriverShift(driverId, schoolId, "evening"),
+          ]);
+          for (const id of [...morningIds, ...eveningIds]) {
+            fleetStudentIds.add(id);
+          }
+        } catch {
+          // driver_trips / service_shift may not exist yet — billed driver filter above is enough
+        }
+      }
+    }
+
+    studentIdsFilter = [...fleetStudentIds];
     if (studentIdsFilter.length === 0) {
       return [];
     }
@@ -626,8 +618,6 @@ export async function getStudents(options?: {
       bookings(
         booking_id,
         driver_id,
-        morning_driver_id,
-        evening_driver_id,
         status,
         created_at,
         updated_at,
@@ -673,35 +663,36 @@ export async function getStudents(options?: {
     const latestBooking = sortedBookings[0] as
       | {
           driver_id: number;
-          morning_driver_id?: number | null;
-          evening_driver_id?: number | null;
           drivers?: DriverSummary | null;
         }
       | undefined;
 
     const billedDriver = latestBooking?.drivers || null;
-    const bookingFields = latestBooking as
-      | {
-          driver_id: number;
-          morning_driver_id?: number | null;
-          evening_driver_id?: number | null;
-        }
-      | undefined;
+    const bookingFields = latestBooking
+      ? { driver_id: latestBooking.driver_id }
+      : undefined;
 
-    const resolved = bookingFields
-      ? await resolveShiftDriversForStudent(
+    let morningId: number | null = null;
+    let eveningId: number | null = null;
+
+    if (bookingFields) {
+      try {
+        const resolved = await resolveShiftDriversForStudent(
           student.student_id,
           student.school_id,
           bookingFields
-        )
-      : { morningDriverId: 0, eveningDriverId: 0 };
-
-    const morningId =
-      resolved.morningDriverId ||
-      (bookingFields ? resolveMorningDriverId(bookingFields) : null);
-    const eveningId =
-      resolved.eveningDriverId ||
-      (bookingFields ? resolveEveningDriverId(bookingFields) : null);
+        );
+        morningId =
+          resolved.morningDriverId ||
+          resolveMorningDriverId(bookingFields);
+        eveningId =
+          resolved.eveningDriverId ||
+          resolveEveningDriverId(bookingFields);
+      } catch {
+        morningId = resolveMorningDriverId(bookingFields);
+        eveningId = resolveEveningDriverId(bookingFields);
+      }
+    }
 
     const idsToLoad = [
       ...new Set([morningId, eveningId].filter((id): id is number => !!id)),
@@ -734,8 +725,8 @@ export async function getStudents(options?: {
       assigned_driver: billedDriver,
       morning_driver,
       evening_driver,
-      morning_driver_id: latestBooking?.morning_driver_id ?? null,
-      evening_driver_id: latestBooking?.evening_driver_id ?? null,
+      morning_driver_id: null,
+      evening_driver_id: null,
       status: student.notification_token as "active" | "inactive" | undefined,
     };
     })
