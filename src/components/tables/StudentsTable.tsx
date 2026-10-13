@@ -134,7 +134,9 @@ export function StudentsTable({
     error,
     refetch,
   } = useStudents(schoolId, driverIds);
-  const { data: allDrivers = [] } = useDrivers();
+  const { data: allDrivers = [] } = useDrivers(
+    schoolId != null ? { schoolId: String(schoolId) } : undefined
+  );
   const drivers = fleetDrivers ?? allDrivers;
   const { mutate: updateStatus } = useUpdateStudentStatus();
   const { mutate: assignDriver } = useAssignDriver();
@@ -190,20 +192,35 @@ export function StudentsTable({
   const filterOptions = useMemo(() => {
     const schools = [...new Set(students.map((s) => s.schools?.name).filter(Boolean))].sort();
     const pincodes = [...new Set(students.map((s) => s.pickup_pincode).filter(Boolean))].sort();
-    // Build unique assigned driver list from students data
+    // Every driver in this view, plus anyone already on a student
+    // (billed, morning, or evening). A driver with no billed students
+    // still has to be selectable.
     const driverMap = new Map<number, { id: number; name: string; cab: string }>();
+    const addDriver = (
+      driver?: {
+        driver_id: number;
+        name?: string | null;
+        cab_number?: string | null;
+      } | null
+    ) => {
+      if (!driver?.driver_id || driverMap.has(driver.driver_id)) return;
+      driverMap.set(driver.driver_id, {
+        id: driver.driver_id,
+        name: driver.name?.trim() || "Unknown",
+        cab: driver.cab_number || "",
+      });
+    };
+    for (const driver of drivers) addDriver(driver);
     for (const s of students) {
-      if (s.assigned_driver) {
-        driverMap.set(s.assigned_driver.driver_id, {
-          id: s.assigned_driver.driver_id,
-          name: s.assigned_driver.name,
-          cab: s.assigned_driver.cab_number,
-        });
-      }
+      addDriver(s.assigned_driver);
+      addDriver(s.morning_driver);
+      addDriver(s.evening_driver);
     }
-    const assignedDrivers = [...driverMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const assignedDrivers = [...driverMap.values()].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
     return { schools, pincodes, assignedDrivers };
-  }, [students]);
+  }, [students, drivers]);
 
   // ── Apply filters ──
   const filteredStudents = useMemo(() => {
@@ -228,12 +245,16 @@ export function StudentsTable({
       // Status
       if (effectiveStatus !== "all" && s.status !== effectiveStatus) return false;
 
-      // Driver
-      if (driverFilter === "with" && !s.assigned_driver) return false;
-      if (driverFilter === "without" && s.assigned_driver) return false;
+      // Driver — billed assignment or either shift
+      const linkedDriverIds = [
+        s.assigned_driver?.driver_id,
+        s.morning_driver?.driver_id,
+        s.evening_driver?.driver_id,
+      ].filter((id): id is number => id != null);
+      if (driverFilter === "with" && linkedDriverIds.length === 0) return false;
+      if (driverFilter === "without" && linkedDriverIds.length > 0) return false;
       if (driverFilter !== "all" && driverFilter !== "with" && driverFilter !== "without") {
-        // Specific driver ID filter
-        if (!s.assigned_driver || s.assigned_driver.driver_id.toString() !== driverFilter) return false;
+        if (!linkedDriverIds.some((id) => id.toString() === driverFilter)) return false;
       }
 
       // Pincode
@@ -512,7 +533,7 @@ export function StudentsTable({
                       <SelectLabel>Specific Driver</SelectLabel>
                       {filterOptions.assignedDrivers.map((d) => (
                         <SelectItem key={d.id} value={d.id.toString()}>
-                          {d.name} - {d.cab}
+                          {d.cab ? `${d.name} - ${d.cab}` : d.name}
                         </SelectItem>
                       ))}
                     </SelectGroup>
