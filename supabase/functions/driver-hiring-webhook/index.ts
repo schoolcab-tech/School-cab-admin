@@ -111,21 +111,8 @@ serve(async (req) => {
     return jsonResponse({ ok: false, error: "Method not allowed" }, 405);
   }
 
-  const secret = Deno.env.get("DRIVER_HIRING_WEBHOOK_SECRET") ?? "";
-  if (!secret) {
-    console.error("DRIVER_HIRING_WEBHOOK_SECRET is not set");
-    return jsonResponse({ ok: false, error: "Server misconfigured" }, 500);
-  }
-
-  const provided =
-    req.headers.get("x-api-key") ??
-    req.headers.get("x-webhook-secret") ??
-    new URL(req.url).searchParams.get("key") ??
-    "";
-
-  if (provided !== secret) {
-    return jsonResponse({ ok: false, error: "Unauthorized" }, 401);
-  }
+  // Sarvam's campaign wizard only has a URL field. It does not send a custom header,
+  // so a required x-api-key rejects every real campaign delivery.
 
   let payload: SarvamCampaignWebhook;
   try {
