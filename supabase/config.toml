@@ -2,3 +2,6 @@ project_id = "wusekilmebfbikwspiic"
 
 [functions.nearest-charger]
 verify_jwt = false
+
+[functions.driver-hiring-webhook]
+verify_jwt = false

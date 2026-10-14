@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
+  Phone,
   Route,
   Settings,
   Users,
@@ -145,6 +146,12 @@ const navigationItems: NavItem[] = [
     title: "Website Leads",
     url: "/website-leads",
     icon: Globe,
+    roles: ['admin', 'master_admin'],
+  },
+  {
+    title: "Driver hiring",
+    url: "/driver-hiring",
+    icon: Phone,
     roles: ['admin', 'master_admin'],
   },
   {

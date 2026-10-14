@@ -73,6 +73,7 @@ import TripSchedulesPage, {
 
 // Website Leads Page
 import WebsiteLeadsPage from "./pages/WebsiteLeadsPage";
+import DriverHiringLeadsPage from "./pages/DriverHiringLeadsPage";
 
 // Master Admin Pages
 import AddCashPaymentPage from "./pages/master-admin/AddCashPaymentPage";
@@ -405,6 +406,14 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <WebsiteLeadsPage />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/driver-hiring"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
+            <DriverHiringLeadsPage />
+          </RoleBasedRoute>
         }
       />
       <Route
