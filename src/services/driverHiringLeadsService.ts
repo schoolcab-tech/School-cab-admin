@@ -121,24 +121,79 @@ export async function softDeleteDriverHiringLead(id: string): Promise<void> {
   if (error) throw error;
 }
 
+const PAGE_SIZE = 1000;
+
+const CALL_LIST_COLUMNS = [
+  "id",
+  "attempt_id",
+  "campaign_id",
+  "cohort_id",
+  "app_id",
+  "phone",
+  "user_identifier",
+  "name",
+  "agent_phone_number",
+  "connectivity_status",
+  "completion_status",
+  "failure_reason",
+  "next_action_status",
+  "duration_sec",
+  "interaction_id",
+  "retry_attempt",
+  "executed_at",
+  "started_at",
+  "ended_at",
+  "interest_type",
+  "preferred_hub",
+  "visit_datetime_text",
+  "has_valid_licence",
+  "has_address_proof",
+  "deposit_path",
+  "lead_score",
+  "lead_tag",
+  "callback_datetime_text",
+  "not_fit_reason",
+  "needs_human_escalation",
+  "call_summary",
+  "created_at",
+].join(", ");
+
+async function fetchAllPages(
+  loadPage: (from: number, to: number) => Promise<{ data: unknown[] | null; error: { message: string } | null }>
+): Promise<unknown[]> {
+  const rows: unknown[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await loadPage(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+}
+
 export async function getDriverHiringCalls(): Promise<DriverHiringCall[]> {
-  const [callsRes, leadsRes] = await Promise.all([
-    (supabase as any)
-      .from("driver_hiring_calls")
-      .select("*")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }),
-    (supabase as any)
-      .from("driver_hiring_leads")
-      .select("id, phone, visit_status")
-      .is("deleted_at", null),
+  const [callRows, leadRows] = await Promise.all([
+    fetchAllPages((from, to) =>
+      (supabase as any)
+        .from("driver_hiring_calls")
+        .select(CALL_LIST_COLUMNS)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to)
+    ),
+    fetchAllPages((from, to) =>
+      (supabase as any)
+        .from("driver_hiring_leads")
+        .select("id, phone, visit_status")
+        .is("deleted_at", null)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
 
-  if (callsRes.error) throw callsRes.error;
-  if (leadsRes.error) throw leadsRes.error;
-
   const leadByPhone = new Map<string, { id: string; visit_status: DriverHiringVisitStatus }>();
-  for (const lead of leadsRes.data || []) {
+  for (const lead of leadRows as Array<{ id: string; phone: string | null; visit_status: DriverHiringVisitStatus }>) {
     if (lead.phone) {
       leadByPhone.set(lead.phone, {
         id: lead.id,
@@ -147,7 +202,7 @@ export async function getDriverHiringCalls(): Promise<DriverHiringCall[]> {
     }
   }
 
-  return (callsRes.data || []).map((call: DriverHiringCall) => {
+  return (callRows as DriverHiringCall[]).map((call) => {
     const lead = call.phone ? leadByPhone.get(call.phone) : undefined;
     return {
       ...call,
@@ -155,6 +210,23 @@ export async function getDriverHiringCalls(): Promise<DriverHiringCall[]> {
       visit_status: lead?.visit_status ?? "none",
     };
   });
+}
+
+export async function getDriverHiringCallDetail(id: string): Promise<
+  Pick<DriverHiringCall, "transcript" | "agent_variables" | "raw_payload">
+> {
+  const { data, error } = await (supabase as any)
+    .from("driver_hiring_calls")
+    .select("transcript, agent_variables, raw_payload")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return {
+    transcript: data?.transcript ?? null,
+    agent_variables: data?.agent_variables ?? null,
+    raw_payload: data?.raw_payload ?? null,
+  };
 }
 
 export async function softDeleteDriverHiringCall(id: string): Promise<void> {

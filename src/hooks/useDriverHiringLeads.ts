@@ -11,7 +11,8 @@ import { useSimpleMutation } from "./useSimpleMutation";
 export const useDriverHiringCalls = () => {
   return useSimpleQuery<DriverHiringCall[]>(
     () => getDriverHiringCalls(),
-    []
+    [],
+    { requestTimeout: 60000 }
   );
 };
 

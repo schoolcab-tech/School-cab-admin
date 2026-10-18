@@ -40,10 +40,11 @@ import {
   useDriverHiringCalls,
   useUpdateDriverHiringVisitStatus,
 } from "@/hooks/useDriverHiringLeads";
-import type {
-  DriverHiringCall,
-  DriverHiringLeadTag,
-  DriverHiringVisitStatus,
+import {
+  getDriverHiringCallDetail,
+  type DriverHiringCall,
+  type DriverHiringLeadTag,
+  type DriverHiringVisitStatus,
 } from "@/services/driverHiringLeadsService";
 import { format } from "date-fns";
 import { Loader2, Trash2 } from "lucide-react";
@@ -106,6 +107,7 @@ export default function DriverHiringLeadsPage() {
   const deleteCall = useDeleteDriverHiringCall();
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [selected, setSelected] = useState<DriverHiringCall | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const filtered = useMemo(() => {
     if (tagFilter === "all") return calls;
@@ -137,6 +139,21 @@ export default function DriverHiringLeadsPage() {
       toast.success("Visit status updated");
     } catch {
       toast.error("Failed to update visit status");
+    }
+  };
+
+  const openDetails = async (call: DriverHiringCall) => {
+    setSelected(call);
+    setDetailLoading(true);
+    try {
+      const detail = await getDriverHiringCallDetail(call.id);
+      setSelected((current) =>
+        current?.id === call.id ? { ...current, ...detail } : current
+      );
+    } catch {
+      toast.error("Could not load the full call");
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -374,7 +391,7 @@ export default function DriverHiringLeadsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setSelected(call)}
+                            onClick={() => openDetails(call)}
                           >
                             Details
                           </Button>
@@ -445,7 +462,9 @@ export default function DriverHiringLeadsPage() {
               <Detail label="Ended" value={formatWhen(selected.ended_at)} />
               <div>
                 <div className="text-sm font-medium mb-2">Transcript</div>
-                {selected.transcript?.length ? (
+                {detailLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading transcript…</p>
+                ) : selected.transcript?.length ? (
                   <div className="space-y-2 text-sm">
                     {selected.transcript.map((turn, index) => (
                       <p key={index}>
@@ -460,15 +479,23 @@ export default function DriverHiringLeadsPage() {
               </div>
               <div>
                 <div className="text-sm font-medium mb-2">Agent variables</div>
-                <pre className="text-xs whitespace-pre-wrap break-words bg-muted rounded-md p-3">
-                  {JSON.stringify(selected.agent_variables ?? {}, null, 2)}
-                </pre>
+                {detailLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                ) : (
+                  <pre className="text-xs whitespace-pre-wrap break-words bg-muted rounded-md p-3">
+                    {JSON.stringify(selected.agent_variables ?? {}, null, 2)}
+                  </pre>
+                )}
               </div>
               <div>
                 <div className="text-sm font-medium mb-2">Raw payload</div>
-                <pre className="text-xs whitespace-pre-wrap break-words bg-muted rounded-md p-3">
-                  {JSON.stringify(selected.raw_payload ?? {}, null, 2)}
-                </pre>
+                {detailLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                ) : (
+                  <pre className="text-xs whitespace-pre-wrap break-words bg-muted rounded-md p-3">
+                    {JSON.stringify(selected.raw_payload ?? {}, null, 2)}
+                  </pre>
+                )}
               </div>
             </div>
           )}
