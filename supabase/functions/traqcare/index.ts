@@ -38,22 +38,24 @@ serve(async (req) => {
     const apiKey = Deno.env.get("TRAQCARE_API_KEY") ?? "";
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const jwt = authHeader?.replace(/^Bearer\s+/i, "").trim();
+    if (!jwt) {
       return jsonResponse({ error: "Missing authorization header" }, 401);
     }
 
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const userClient = createClient(supabaseUrl, supabaseAnonKey);
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const {
       data: { user },
       error: userError,
-    } = await userClient.auth.getUser();
+    } = await userClient.auth.getUser(jwt);
 
     if (userError || !user) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+      return jsonResponse(
+        { error: userError?.message || "Unauthorized" },
+        401
+      );
     }
 
     const body = (await req.json()) as TraqcareRequest & { schoolId?: number };
