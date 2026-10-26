@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
+import { UatBanner } from "@/components/UatBanner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import Login from "@/pages/auth/Login";
@@ -1001,6 +1002,7 @@ const App = () => (
   <AuthProvider>
     <ModeratorSchoolProvider>
       <TooltipProvider>
+        <UatBanner />
         <Toaster />
         <Sonner />
         <BrowserRouter>
