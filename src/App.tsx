@@ -86,6 +86,7 @@ import EarningsPage from "./pages/master-admin/EarningsPage";
 import FleetMappingPage from "./pages/master-admin/FleetMappingPage";
 import FleetOwnersPage from "./pages/master-admin/FleetOwnersPage";
 import LiveTrackingPage from "./pages/master-admin/LiveTrackingPage";
+import DashcamPage from "./pages/master-admin/DashcamPage";
 import DriverTrackingDetailPage from "./pages/tracking/DriverTrackingDetailPage";
 import SchoolAdminsPage from "./pages/master-admin/SchoolAdminsPage";
 import PlatformAdminsPage from "./pages/master-admin/PlatformAdminsPage";
@@ -534,6 +535,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/master-admin/dashcams"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
+            <DashcamPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
         path="/vehicles"
         element={
           <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
@@ -862,6 +871,14 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["moderator"]}>
             <SchoolAdminLiveTrackingPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/moderator/dashcams"
+        element={
+          <RoleBasedRoute allowedRoles={["moderator"]}>
+            <DashcamPage />
           </RoleBasedRoute>
         }
       />

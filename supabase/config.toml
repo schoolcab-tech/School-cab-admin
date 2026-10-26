@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.driver-hiring-webhook]
 verify_jwt = false
+
+[functions.traqcare]
+verify_jwt = true

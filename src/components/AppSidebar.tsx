@@ -17,6 +17,7 @@ import {
   Building2,
   UserCog,
   History,
+  Camera,
   DollarSign,
   Truck,
   Zap,
@@ -44,6 +45,8 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
+import { useModeratorSchoolContextOptional } from "@/contexts/moderator-school-context";
+import { TRAQCARE_SCHOOL_ID } from "@/lib/traqcareSchool";
 import type { Database } from "@/integrations/supabase/types";
 
 type UserRole = Database['public']['Enums']['app_role'];
@@ -53,6 +56,8 @@ type NavItem = {
   url: string;
   icon: any;
   roles: UserRole[];
+  /** Moderators only see this while Test School - Bangalore is selected. */
+  traqcareSchoolOnly?: boolean;
 };
 
 // Navigation items for different roles
@@ -196,6 +201,12 @@ const navigationItems: NavItem[] = [
     title: "Live Tracking",
     url: "/master-admin/live-tracking",
     icon: MapPin,
+    roles: ['master_admin', 'admin'],
+  },
+  {
+    title: "Dashcams",
+    url: "/master-admin/dashcams",
+    icon: Camera,
     roles: ['master_admin', 'admin'],
   },
   {
@@ -421,6 +432,13 @@ const navigationItems: NavItem[] = [
     roles: ['moderator'],
   },
   {
+    title: "Dashcams",
+    url: "/moderator/dashcams",
+    icon: Camera,
+    roles: ['moderator'],
+    traqcareSchoolOnly: true,
+  },
+  {
     title: "Performance",
     url: "/moderator/performance",
     icon: TrendingUp,
@@ -444,13 +462,18 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const { userRole, signOut } = useAuth();
+  const moderatorSchool = useModeratorSchoolContextOptional();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
 
   // Filter navigation items based on user role
   const visibleNavItems = navigationItems.filter((item) => {
     if (!userRole) return false;
-    return item.roles.includes(userRole);
+    if (!item.roles.includes(userRole)) return false;
+    if (item.traqcareSchoolOnly && userRole === "moderator") {
+      return moderatorSchool?.activeSchoolId === TRAQCARE_SCHOOL_ID;
+    }
+    return true;
   });
 
   const isActive = (path: string) => {
