@@ -50,24 +50,23 @@ serve(async (req) => {
     }
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const jwt = authHeader?.replace(/^Bearer\s+/i, "").trim();
+    if (!jwt) {
       console.warn(`[livekit-token][${reqId}] ✗ no Authorization header`);
       return jsonResponse({ error: "Missing authorization header" }, 401);
     }
 
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const userClient = createClient(supabaseUrl, supabaseAnonKey);
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const {
       data: { user },
       error: userError,
-    } = await userClient.auth.getUser();
+    } = await userClient.auth.getUser(jwt);
 
     if (userError || !user) {
       console.warn(`[livekit-token][${reqId}] ✗ auth failed:`, userError?.message);
-      return jsonResponse({ error: "Unauthorized" }, 401);
+      return jsonResponse({ error: userError?.message || "Unauthorized" }, 401);
     }
 
     console.log(`[livekit-token][${reqId}] ✓ user authenticated: ${user.id}`);
