@@ -74,6 +74,7 @@ import TripSchedulesPage, {
 // Website Leads Page
 import WebsiteLeadsPage from "./pages/WebsiteLeadsPage";
 import DriverHiringLeadsPage from "./pages/DriverHiringLeadsPage";
+import ParentCallingLeadsPage from "./pages/ParentCallingLeadsPage";
 
 // Master Admin Pages
 import AddCashPaymentPage from "./pages/master-admin/AddCashPaymentPage";
@@ -413,6 +414,14 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
             <DriverHiringLeadsPage />
+          </RoleBasedRoute>
+        }
+      />
+      <Route
+        path="/parent-calling"
+        element={
+          <RoleBasedRoute allowedRoles={["master_admin", "admin"]}>
+            <ParentCallingLeadsPage />
           </RoleBasedRoute>
         }
       />
