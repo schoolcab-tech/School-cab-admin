@@ -155,6 +155,12 @@ const navigationItems: NavItem[] = [
     roles: ['admin', 'master_admin'],
   },
   {
+    title: "Parent calling",
+    url: "/parent-calling",
+    icon: GraduationCap,
+    roles: ['admin', 'master_admin'],
+  },
+  {
     title: "Settings",
     url: "/settings",
     icon: Settings,
