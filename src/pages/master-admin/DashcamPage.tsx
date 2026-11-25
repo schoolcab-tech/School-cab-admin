@@ -10,6 +10,7 @@ import { useSimpleQuery } from "@/hooks/useSimpleQuery";
 import {
   dashcamStatusLabel,
   getDashcamLive,
+  getDashcamPlayerUrl,
   humanizeAlarm,
   type DashcamFix,
 } from "@/services/dashcamService";
@@ -63,6 +64,41 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DashcamPlayer() {
+  const { data: url, isLoading, error } = useSimpleQuery(getDashcamPlayerUrl, []);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-xl">Live camera</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Front and cabin views from the dashcam. Playback starts on its own.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        {error && (
+          <p className="px-6 pb-6 text-sm text-destructive">{error.message}</p>
+        )}
+        {isLoading && !url && (
+          <div className="flex h-[640px] items-center justify-center gap-2 bg-black text-white/70">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Opening camera…
+          </div>
+        )}
+        {url && (
+          <iframe
+            src={url}
+            title="Dashcam live stream"
+            className="h-[640px] w-full border-0 bg-black"
+            allow="autoplay; fullscreen; encrypted-media"
+            referrerPolicy="no-referrer"
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DashcamPage() {
   const { data, isLoading, error, refetch } = useSimpleQuery(getDashcamLive, [], {
     refetchInterval: 10000,
@@ -78,7 +114,7 @@ export default function DashcamPage() {
               Dashcam
             </h1>
             <p className="text-muted-foreground">
-              Live position from the Traqcare dashcam. Updates every 10 seconds.
+              Live camera and position from the Traqcare dashcam. Position updates every 10 seconds.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
@@ -86,6 +122,8 @@ export default function DashcamPage() {
             Refresh
           </Button>
         </div>
+
+        <DashcamPlayer />
 
         {error && (
           <Card>
