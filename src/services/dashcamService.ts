@@ -68,11 +68,17 @@ export function humanizeAlarm(code: string) {
 
 export async function getDashcamLive(): Promise<DashcamFix> {
   const response = await fetch("/api/traqcare/live");
-  const body = (await response.json()) as {
+  const raw = await response.text();
+  let body: {
     trackingData?: LiveRow[];
     message?: string;
     error?: string;
   };
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new Error("Dashcam feed returned a page instead of tracking data");
+  }
   if (!response.ok) {
     throw new Error(body.message || body.error || "Dashcam feed failed");
   }
