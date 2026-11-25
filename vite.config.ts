@@ -2,10 +2,30 @@ import { defineConfig, loadEnv, type Connect, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { dashcamPlayerPayload } from "./api/traqcare/player.js";
 
 function traqcareLivePlugin(env: Record<string, string>): Plugin {
   const handler: Connect.NextHandleFunction = async (req, res, next) => {
     const requestUrl = req.url ?? "";
+    if (requestUrl.startsWith("/api/traqcare/player")) {
+      if (req.method !== "GET") {
+        res.statusCode = 405;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: "Method not allowed" }));
+        return;
+      }
+      const result = await dashcamPlayerPayload({
+        authorization: req.headers.authorization || "",
+        token: env.TRAQCARE_ACCESS_TOKEN,
+        imei: env.TRAQCARE_IMEI || "124082278812",
+        base: env.TRAQCARE_BASE_URL || "https://a1.traqcare.com/v2.12",
+      });
+      res.statusCode = result.status;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(result.body));
+      return;
+    }
+
     if (!requestUrl.startsWith("/api/traqcare/live")) {
       next();
       return;

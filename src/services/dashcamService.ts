@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export type DashcamFix = {
   deviceId: string;
   objectName: string;
@@ -64,6 +66,30 @@ export function dashcamStatusLabel(code: string) {
 export function humanizeAlarm(code: string) {
   const spaced = code.replace(/([a-z])([A-Z])/g, "$1 $2");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+export async function getDashcamPlayerUrl(): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("Sign in required");
+  }
+
+  const response = await fetch("/api/traqcare/player", {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  const raw = await response.text();
+  let body: { url?: string; error?: string; message?: string };
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new Error("Dashcam player returned a page instead of a stream link");
+  }
+  if (!response.ok || !body.url) {
+    throw new Error(body.error || body.message || "Dashcam stream failed");
+  }
+  return body.url;
 }
 
 export async function getDashcamLive(): Promise<DashcamFix> {
