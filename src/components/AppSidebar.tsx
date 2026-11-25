@@ -14,6 +14,7 @@ import {
   Settings,
   Users,
   Ticket,
+  Video,
   Building2,
   UserCog,
   History,
@@ -202,6 +203,12 @@ const navigationItems: NavItem[] = [
     title: "Live Tracking",
     url: "/master-admin/live-tracking",
     icon: MapPin,
+    roles: ['master_admin', 'admin'],
+  },
+  {
+    title: "Dashcam",
+    url: "/master-admin/dashcam",
+    icon: Video,
     roles: ['master_admin', 'admin'],
   },
   {
